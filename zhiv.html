@@ -2,14 +2,71 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Wasteland Agent: Smart Gen & UI Fix</title>
+    <title>Wasteland Agent: HTML UI</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-        body { margin: 0; background-color: #050505; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        #game-container { border: 3px solid #222; box-shadow: 0 0 20px rgba(0,255,0,0.1); }
+        body { 
+            margin: 0; 
+            background-color: #050505; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            overflow: hidden; 
+            font-family: 'Courier New', Courier, monospace;
+            color: #00ff00;
+        }
+        
+        /* Боковая панель интерфейса */
+        #ui-panel {
+            width: 260px;
+            height: 600px; /* Высота совпадает с высотой игры */
+            background-color: #0a0a0a;
+            border: 3px solid #222;
+            margin-right: 20px;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.05);
+        }
+
+        .ui-section { border-bottom: 1px dashed #333; padding-bottom: 15px; }
+        .ui-section:last-child { border-bottom: none; }
+        h3 { margin: 0 0 10px 0; color: #777; font-size: 16px; letter-spacing: 1px; }
+        .stat-row { margin-bottom: 8px; font-size: 15px; }
+        .val { font-weight: bold; color: #fff; }
+        .val-orange { font-weight: bold; color: #ffa500; }
+        .val-blue { font-weight: bold; color: #00aaff; }
+
+        #game-container { 
+            border: 3px solid #222; 
+            box-shadow: 0 0 20px rgba(0,255,0,0.1); 
+        }
     </style>
 </head>
 <body>
+
+<!-- HTML Интерфейс вынесен за пределы канваса -->
+<div id="ui-panel">
+    <div class="ui-section">
+        <h3>АГЕНТ</h3>
+        <div class="stat-row">ЖИЗНИ: <span id="ui-lives" class="val">3</span> / 3</div>
+    </div>
+    <div class="ui-section">
+        <h3>ИНВЕНТАРЬ</h3>
+        <div class="stat-row">Слизней: <span id="ui-slugs" class="val">0</span></div>
+        <div class="stat-row">Флешек: <span id="ui-intel" class="val">0</span></div>
+        <div class="stat-row">Лута: <span id="ui-loot" class="val">0</span></div>
+    </div>
+    <div class="ui-section">
+        <h3>БАЗА</h3>
+        <div class="stat-row">Данные (синий ящик): <span id="ui-chest-intel" class="val-blue">0</span></div>
+        <div class="stat-row">Лут (оранжевый ящик): <span id="ui-chest-loot" class="val-orange">0</span></div>
+        <div class="stat-row" style="margin-top: 15px; color: #ffaa00;">Отдано Упырю: <span id="ui-npc-slugs" class="val">0</span></div>
+    </div>
+</div>
 
 <div id="game-container"></div>
 
@@ -38,7 +95,6 @@
             };
             this.isInvulnerable = false;
 
-            // 0 - улица, 1 - стена, 2 - база, 3 - пол внутри дома
             this.mapGrid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
 
             this.walls = this.physics.add.staticGroup();
@@ -46,13 +102,12 @@
             bgGraphics.fillStyle(0x111111, 1);
             bgGraphics.fillRect(0, 0, worldWidth, worldHeight);
 
-            // === БАЗА ===
+            // База
             const baseStart = Math.floor(GRID_SIZE / 2) - 5;
             const baseSizePx = 10 * TILE_SIZE;
             const baseXPx = baseStart * TILE_SIZE;
             const baseYPx = baseStart * TILE_SIZE;
             
-            // Защитный буфер базы (сама база + 1 клетка вокруг, чтобы не строили впритык)
             for(let bx = baseStart - 1; bx < baseStart + 11; bx++) {
                 for(let by = baseStart - 1; by < baseStart + 11; by++) {
                     if(this.mapGrid[bx] !== undefined) this.mapGrid[bx][by] = 2;
@@ -65,7 +120,7 @@
             this.baseBarrier = this.add.zone(baseXPx + baseSizePx/2, baseYPx + baseSizePx/2, baseSizePx, baseSizePx);
             this.physics.add.existing(this.baseBarrier, true);
 
-            // === УМНАЯ ГЕНЕРАЦИЯ ЗАБРОШЕК (Без наложений) ===
+            // Заброшки
             let roomsBuilt = 0;
             let attempts = 0;
             
@@ -76,7 +131,6 @@
                 let roomX = Phaser.Math.Between(2, GRID_SIZE - roomW - 2);
                 let roomY = Phaser.Math.Between(2, GRID_SIZE - roomH - 2);
 
-                // Проверка: есть ли вокруг будущей комнаты место (включая 1 клетку буфера)
                 let canPlace = true;
                 for (let x = roomX - 1; x <= roomX + roomW; x++) {
                     for (let y = roomY - 1; y <= roomY + roomH; y++) {
@@ -88,7 +142,6 @@
                     if (!canPlace) break;
                 }
 
-                // Если место свободно, строим дом
                 if (canPlace) {
                     let wallsList = [];
                     for (let x = roomX; x < roomX + roomW; x++) {
@@ -96,12 +149,11 @@
                             if (x === roomX || x === roomX + roomW - 1 || y === roomY || y === roomY + roomH - 1) {
                                 wallsList.push({x, y});
                             } else {
-                                this.mapGrid[x][y] = 3; // Помечаем как пол внутри
+                                this.mapGrid[x][y] = 3; 
                             }
                         }
                     }
 
-                    // Гарантированно выбиваем 2 выхода
                     Phaser.Utils.Array.Shuffle(wallsList);
                     let door1 = wallsList.pop();
                     let door2 = wallsList.pop();
@@ -109,7 +161,7 @@
                     this.mapGrid[door2.x][door2.y] = 0;
 
                     wallsList.forEach(pos => {
-                        this.mapGrid[pos.x][pos.y] = 1; // Стена
+                        this.mapGrid[pos.x][pos.y] = 1; 
                         let wall = this.add.rectangle(pos.x * TILE_SIZE + TILE_SIZE/2, pos.y * TILE_SIZE + TILE_SIZE/2, TILE_SIZE, TILE_SIZE, 0x5c4033);
                         this.walls.add(wall);
                     });
@@ -117,7 +169,7 @@
                 }
             }
 
-            // === ОБЪЕКТЫ НА БАЗЕ ===
+            // Объекты базы
             this.intelChest = this.add.rectangle(baseXPx + 64, baseYPx + 64, 24, 24, 0x00aaff);
             this.lootChest = this.add.rectangle(baseXPx + 64, baseYPx + baseSizePx - 64, 24, 24, 0xffa500);
             this.npc = this.add.rectangle(baseXPx + baseSizePx - 64, baseYPx + baseSizePx/2, 24, 24, 0xffaa00);
@@ -130,26 +182,25 @@
             this.add.text(this.lootChest.x - 15, this.lootChest.y - 25, 'Лут', { fontSize: '11px', fill: '#ffa500' });
             this.add.text(this.npc.x - 20, this.npc.y - 25, 'Упырь', { fontSize: '11px', fill: '#ffaa00' });
 
-            // === ИГРОК ===
+            // Игрок
             this.player = this.add.circle(baseXPx + baseSizePx/2, baseYPx + baseSizePx/2, 12, 0xffffff);
             this.physics.add.existing(this.player);
             this.player.body.setCollideWorldBounds(true);
             this.physics.add.collider(this.player, this.walls);
 
-            // === ГРУППЫ ПРЕДМЕТОВ И ВРАГОВ ===
+            // Группы
             this.slugsGroup = this.physics.add.group();
             this.intelGroup = this.physics.add.group();
             this.genLootGroup = this.physics.add.group();
             this.heartsGroup = this.physics.add.group();
             this.zombiesGroup = this.physics.add.group();
 
-            // Спавн с учетом пустых улиц (0) и полов комнат (3)
             this.spawnObjectsOnGrid(this.slugsGroup, 25, 0x00ff00, 6);
             this.spawnObjectsOnGrid(this.intelGroup, 10, 0x0000ff, 6);
             this.spawnObjectsOnGrid(this.heartsGroup, 5, 0xff0055, 8);
             this.spawnObjectsOnGrid(this.zombiesGroup, 30, 0xff0000, 10, true);
 
-            // === КОЛЛИЗИИ ===
+            // Коллизии
             this.physics.add.collider(this.zombiesGroup, this.walls);
             this.physics.add.collider(this.zombiesGroup, this.baseBarrier);
 
@@ -164,20 +215,11 @@
 
             this.physics.add.overlap(this.player, this.zombiesGroup, this.hitPlayer, null, this);
 
-            // === КАМЕРА И ИНТЕРФЕЙС ===
+            // Камера
             this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
             this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
             this.cameras.main.setZoom(1.2);
 
-            this.uiText = this.add.text(20, 20, '', { 
-                font: '15px Courier', 
-                fill: '#00ff00', 
-                backgroundColor: 'rgba(0,0,0,0.85)',
-                padding: { x: 15, y: 15 },
-                lineSpacing: 6
-            });
-            this.uiText.setScrollFactor(0);
-            this.uiText.setDepth(100);
             this.updateUI();
 
             this.cursors = this.input.keyboard.createCursorKeys();
@@ -192,7 +234,6 @@
                 let tx = Phaser.Math.Between(1, this.mapGrid.length - 2);
                 let ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
                 
-                // 0 = Пустырь/Улица, 3 = Пол внутри комнаты
                 if (this.mapGrid[tx][ty] === 0 || this.mapGrid[tx][ty] === 3) {
                     let actualColor = Array.isArray(color) ? Phaser.Utils.Array.GetRandom(color) : color;
                     let obj = this.add.circle(tx * 32 + 16, ty * 32 + 16, size, actualColor);
@@ -239,7 +280,6 @@
         exchangeSlugs() {
             if (this.playerStats.slugs > 0) {
                 let amountToSpawn = this.playerStats.slugs * 3;
-                // Спавним лут случайного цвета (оранжевый или желтый)
                 this.spawnObjectsOnGrid(this.genLootGroup, amountToSpawn, [0xffa500, 0xffff00], 6);
                 
                 this.playerStats.npcSlugs += this.playerStats.slugs;
@@ -280,16 +320,15 @@
             }
         }
 
+        // Новая функция обновления HTML интерфейса вместо текста на холсте
         updateUI() {
-            this.uiText.setText(
-                `[ ЖИЗНИ: ${this.playerStats.lives} / 3 ]\n\n` +
-                `== С собой ==\n` +
-                `Слизней: ${this.playerStats.slugs} | Флешек: ${this.playerStats.intel} | Лута: ${this.playerStats.generalLoot}\n\n` +
-                `== На базе ==\n` +
-                `Флешек в ящике: ${this.playerStats.chestIntel}\n` +
-                `Лута в ящике:   ${this.playerStats.chestLoot}\n` +
-                `Отдано Упырю:   ${this.playerStats.npcSlugs}`
-            );
+            document.getElementById('ui-lives').innerText = this.playerStats.lives;
+            document.getElementById('ui-slugs').innerText = this.playerStats.slugs;
+            document.getElementById('ui-intel').innerText = this.playerStats.intel;
+            document.getElementById('ui-loot').innerText = this.playerStats.generalLoot;
+            document.getElementById('ui-chest-intel').innerText = this.playerStats.chestIntel;
+            document.getElementById('ui-chest-loot').innerText = this.playerStats.chestLoot;
+            document.getElementById('ui-npc-slugs').innerText = this.playerStats.npcSlugs;
         }
 
         update() {
