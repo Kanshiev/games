@@ -2,11 +2,11 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Wasteland Agent: Fixes & Mechanics</title>
+    <title>Wasteland Agent: Smart Gen & UI Fix</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         body { margin: 0; background-color: #050505; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        #game-container { border: 3px solid #222; }
+        #game-container { border: 3px solid #222; box-shadow: 0 0 20px rgba(0,255,0,0.1); }
     </style>
 </head>
 <body>
@@ -27,7 +27,6 @@
 
             this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
 
-            // Игровые данные
             this.playerStats = {
                 lives: 3,
                 slugs: 0,
@@ -39,7 +38,7 @@
             };
             this.isInvulnerable = false;
 
-            // Сетка для контроля пустых зон (0 - пусто, 1 - стена, 2 - база)
+            // 0 - улица, 1 - стена, 2 - база, 3 - пол внутри дома
             this.mapGrid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
 
             this.walls = this.physics.add.staticGroup();
@@ -53,66 +52,83 @@
             const baseXPx = baseStart * TILE_SIZE;
             const baseYPx = baseStart * TILE_SIZE;
             
-            // Запись базы в сетку
-            for(let bx = baseStart; bx < baseStart + 10; bx++) {
-                for(let by = baseStart; by < baseStart + 10; by++) {
-                    this.mapGrid[bx][by] = 2;
+            // Защитный буфер базы (сама база + 1 клетка вокруг, чтобы не строили впритык)
+            for(let bx = baseStart - 1; bx < baseStart + 11; bx++) {
+                for(let by = baseStart - 1; by < baseStart + 11; by++) {
+                    if(this.mapGrid[bx] !== undefined) this.mapGrid[bx][by] = 2;
                 }
             }
 
             bgGraphics.fillStyle(0x1b4d22, 1);
             bgGraphics.fillRect(baseXPx, baseYPx, baseSizePx, baseSizePx);
 
-            // Невидимый барьер от зомби вокруг базы
             this.baseBarrier = this.add.zone(baseXPx + baseSizePx/2, baseYPx + baseSizePx/2, baseSizePx, baseSizePx);
-            this.physics.add.existing(this.baseBarrier, true); // true = статический объект
+            this.physics.add.existing(this.baseBarrier, true);
 
-            // === ГЕНЕРАЦИЯ ЗАБРОШЕК ===
-            for (let i = 0; i < 20; i++) {
+            // === УМНАЯ ГЕНЕРАЦИЯ ЗАБРОШЕК (Без наложений) ===
+            let roomsBuilt = 0;
+            let attempts = 0;
+            
+            while (roomsBuilt < 25 && attempts < 300) {
+                attempts++;
                 let roomW = Phaser.Math.Between(5, 9);
                 let roomH = Phaser.Math.Between(5, 9);
-                let roomX = Phaser.Math.Between(1, GRID_SIZE - roomW - 2);
-                let roomY = Phaser.Math.Between(1, GRID_SIZE - roomH - 2);
+                let roomX = Phaser.Math.Between(2, GRID_SIZE - roomW - 2);
+                let roomY = Phaser.Math.Between(2, GRID_SIZE - roomH - 2);
 
-                // Проверка наложения на базу
-                if (roomX + roomW > baseStart - 2 && roomX < baseStart + 12 &&
-                    roomY + roomH > baseStart - 2 && roomY < baseStart + 12) {
-                    continue;
-                }
-
-                let wallsList = [];
-                for (let x = roomX; x < roomX + roomW; x++) {
-                    for (let y = roomY; y < roomY + roomH; y++) {
-                        if (x === roomX || x === roomX + roomW - 1 || y === roomY || y === roomY + roomH - 1) {
-                            wallsList.push({x, y});
+                // Проверка: есть ли вокруг будущей комнаты место (включая 1 клетку буфера)
+                let canPlace = true;
+                for (let x = roomX - 1; x <= roomX + roomW; x++) {
+                    for (let y = roomY - 1; y <= roomY + roomH; y++) {
+                        if (this.mapGrid[x][y] !== 0) { 
+                            canPlace = false;
+                            break;
                         }
                     }
+                    if (!canPlace) break;
                 }
 
-                // Гарантированно выбиваем 2 дыры для входа
-                Phaser.Utils.Array.Shuffle(wallsList);
-                wallsList.pop();
-                wallsList.pop();
+                // Если место свободно, строим дом
+                if (canPlace) {
+                    let wallsList = [];
+                    for (let x = roomX; x < roomX + roomW; x++) {
+                        for (let y = roomY; y < roomY + roomH; y++) {
+                            if (x === roomX || x === roomX + roomW - 1 || y === roomY || y === roomY + roomH - 1) {
+                                wallsList.push({x, y});
+                            } else {
+                                this.mapGrid[x][y] = 3; // Помечаем как пол внутри
+                            }
+                        }
+                    }
 
-                wallsList.forEach(pos => {
-                    this.mapGrid[pos.x][pos.y] = 1; // Отмечаем стену в сетке
-                    let wall = this.add.rectangle(pos.x * TILE_SIZE + TILE_SIZE/2, pos.y * TILE_SIZE + TILE_SIZE/2, TILE_SIZE, TILE_SIZE, 0x5c4033);
-                    this.walls.add(wall);
-                });
+                    // Гарантированно выбиваем 2 выхода
+                    Phaser.Utils.Array.Shuffle(wallsList);
+                    let door1 = wallsList.pop();
+                    let door2 = wallsList.pop();
+                    this.mapGrid[door1.x][door1.y] = 0; 
+                    this.mapGrid[door2.x][door2.y] = 0;
+
+                    wallsList.forEach(pos => {
+                        this.mapGrid[pos.x][pos.y] = 1; // Стена
+                        let wall = this.add.rectangle(pos.x * TILE_SIZE + TILE_SIZE/2, pos.y * TILE_SIZE + TILE_SIZE/2, TILE_SIZE, TILE_SIZE, 0x5c4033);
+                        this.walls.add(wall);
+                    });
+                    roomsBuilt++;
+                }
             }
 
             // === ОБЪЕКТЫ НА БАЗЕ ===
-            this.intelChest = this.add.rectangle(baseXPx + 64, baseYPx + 64, 24, 24, 0x00aaff); // Синий ящик (флешки)
-            this.lootChest = this.add.rectangle(baseXPx + 64, baseYPx + baseSizePx - 64, 24, 24, 0xffa500); // Оранжевый ящик (лут)
-            this.npc = this.add.rectangle(baseXPx + baseSizePx - 64, baseYPx + baseSizePx/2, 24, 24, 0xffaa00); // Упырь
+            this.intelChest = this.add.rectangle(baseXPx + 64, baseYPx + 64, 24, 24, 0x00aaff);
+            this.lootChest = this.add.rectangle(baseXPx + 64, baseYPx + baseSizePx - 64, 24, 24, 0xffa500);
+            this.npc = this.add.rectangle(baseXPx + baseSizePx - 64, baseYPx + baseSizePx/2, 24, 24, 0xffaa00);
 
             this.physics.add.existing(this.intelChest, true);
             this.physics.add.existing(this.lootChest, true);
             this.physics.add.existing(this.npc, true);
 
-            this.add.text(this.intelChest.x - 30, this.intelChest.y - 25, 'Данные', { fontSize: '12px', fill: '#00aaff' });
-            this.add.text(this.lootChest.x - 20, this.lootChest.y - 25, 'Лут', { fontSize: '12px', fill: '#ffa500' });
-            this.add.text(this.npc.x - 20, this.npc.y - 25, 'Упырь', { fontSize: '12px', fill: '#ffaa00' });
+            this.add.text(this.intelChest.x - 25, this.intelChest.y - 25, 'Флешки', { fontSize: '11px', fill: '#00aaff' });
+            this.add.text(this.lootChest.x - 15, this.lootChest.y - 25, 'Лут', { fontSize: '11px', fill: '#ffa500' });
+            this.add.text(this.npc.x - 20, this.npc.y - 25, 'Упырь', { fontSize: '11px', fill: '#ffaa00' });
 
             // === ИГРОК ===
             this.player = this.add.circle(baseXPx + baseSizePx/2, baseYPx + baseSizePx/2, 12, 0xffffff);
@@ -123,19 +139,18 @@
             // === ГРУППЫ ПРЕДМЕТОВ И ВРАГОВ ===
             this.slugsGroup = this.physics.add.group();
             this.intelGroup = this.physics.add.group();
-            this.genLootGroup = this.physics.add.group(); // Общий лут
+            this.genLootGroup = this.physics.add.group();
             this.heartsGroup = this.physics.add.group();
             this.zombiesGroup = this.physics.add.group();
 
-            // Спавн стартового лута (с учетом стен)
-            this.spawnObjectsOnGrid(this.slugsGroup, 25, 0x00ff00, 6); // Слизни
-            this.spawnObjectsOnGrid(this.intelGroup, 10, 0x0000ff, 6); // Флешки (макс 10)
-            this.spawnObjectsOnGrid(this.heartsGroup, 5, 0xff0055, 8); // Сердца
-            this.spawnObjectsOnGrid(this.zombiesGroup, 30, 0xff0000, 10, true); // Зомби
+            // Спавн с учетом пустых улиц (0) и полов комнат (3)
+            this.spawnObjectsOnGrid(this.slugsGroup, 25, 0x00ff00, 6);
+            this.spawnObjectsOnGrid(this.intelGroup, 10, 0x0000ff, 6);
+            this.spawnObjectsOnGrid(this.heartsGroup, 5, 0xff0055, 8);
+            this.spawnObjectsOnGrid(this.zombiesGroup, 30, 0xff0000, 10, true);
 
-            // === КОЛЛИЗИИ И ВЗАИМОДЕЙСТВИЯ ===
+            // === КОЛЛИЗИИ ===
             this.physics.add.collider(this.zombiesGroup, this.walls);
-            // Зомби не могут пройти на базу
             this.physics.add.collider(this.zombiesGroup, this.baseBarrier);
 
             this.physics.add.overlap(this.player, this.slugsGroup, (p, item) => this.collectItem(item, 'slugs'), null, this);
@@ -149,39 +164,42 @@
 
             this.physics.add.overlap(this.player, this.zombiesGroup, this.hitPlayer, null, this);
 
-            // === КАМЕРА И UI ===
+            // === КАМЕРА И ИНТЕРФЕЙС ===
             this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
             this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
             this.cameras.main.setZoom(1.2);
 
-            this.uiText = this.add.text(10, 10, '', { 
-                font: '14px Courier', 
+            this.uiText = this.add.text(20, 20, '', { 
+                font: '15px Courier', 
                 fill: '#00ff00', 
-                backgroundColor: '#000000',
-                padding: { x: 10, y: 10 }
+                backgroundColor: 'rgba(0,0,0,0.85)',
+                padding: { x: 15, y: 15 },
+                lineSpacing: 6
             });
             this.uiText.setScrollFactor(0);
-            this.uiText.setDepth(100); // UI всегда поверх всего
+            this.uiText.setDepth(100);
             this.updateUI();
 
             this.cursors = this.input.keyboard.createCursorKeys();
             this.wasd = this.input.keyboard.addKeys('W,A,S,D');
         }
 
-        // Универсальная функция спавна на свободных клетках
         spawnObjectsOnGrid(group, count, color, size, isZombie = false) {
             let spawned = 0;
-            while (spawned < count) {
+            let attempts = 0;
+            while (spawned < count && attempts < 1500) {
+                attempts++;
                 let tx = Phaser.Math.Between(1, this.mapGrid.length - 2);
                 let ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
                 
-                // Проверяем, что клетка пустая (0)
-                if (this.mapGrid[tx][ty] === 0) {
-                    let obj = this.add.circle(tx * 32 + 16, ty * 32 + 16, size, color);
+                // 0 = Пустырь/Улица, 3 = Пол внутри комнаты
+                if (this.mapGrid[tx][ty] === 0 || this.mapGrid[tx][ty] === 3) {
+                    let actualColor = Array.isArray(color) ? Phaser.Utils.Array.GetRandom(color) : color;
+                    let obj = this.add.circle(tx * 32 + 16, ty * 32 + 16, size, actualColor);
                     group.add(obj);
                     if (isZombie) {
                         obj.body.setCollideWorldBounds(true);
-                        obj.body.setBounce(1); // Отскок от стен
+                        obj.body.setBounce(1);
                     }
                     spawned++;
                 }
@@ -218,12 +236,11 @@
             }
         }
 
-        // Обмен слизней на лут у Упыря
         exchangeSlugs() {
             if (this.playerStats.slugs > 0) {
                 let amountToSpawn = this.playerStats.slugs * 3;
-                // Упырь разбрасывает оранжевый лут по карте
-                this.spawnObjectsOnGrid(this.genLootGroup, amountToSpawn, 0xffa500, 6);
+                // Спавним лут случайного цвета (оранжевый или желтый)
+                this.spawnObjectsOnGrid(this.genLootGroup, amountToSpawn, [0xffa500, 0xffff00], 6);
                 
                 this.playerStats.npcSlugs += this.playerStats.slugs;
                 this.playerStats.slugs = 0;
@@ -244,7 +261,6 @@
                 this.playerStats.intel = 0;
                 this.playerStats.generalLoot = 0;
                 
-                // Возврат на базу
                 this.player.x = 30 * 32;
                 this.player.y = 30 * 32;
                 this.updateUI();
@@ -266,13 +282,13 @@
 
         updateUI() {
             this.uiText.setText(
-                `[ ЖИЗНИ: ${this.playerStats.lives} / 3 ]\n` +
-                `С собой:\n` +
-                `Слизней: ${this.playerStats.slugs} | Флешек: ${this.playerStats.intel} | Лута: ${this.playerStats.generalLoot}\n` +
-                `На базе:\n` +
+                `[ ЖИЗНИ: ${this.playerStats.lives} / 3 ]\n\n` +
+                `== С собой ==\n` +
+                `Слизней: ${this.playerStats.slugs} | Флешек: ${this.playerStats.intel} | Лута: ${this.playerStats.generalLoot}\n\n` +
+                `== На базе ==\n` +
                 `Флешек в ящике: ${this.playerStats.chestIntel}\n` +
-                `Лута в ящике: ${this.playerStats.chestLoot}\n` +
-                `Отдано Упырю: ${this.playerStats.npcSlugs}`
+                `Лута в ящике:   ${this.playerStats.chestLoot}\n` +
+                `Отдано Упырю:   ${this.playerStats.npcSlugs}`
             );
         }
 
@@ -288,11 +304,10 @@
 
             const zombieSpeed = 40; 
             this.zombiesGroup.children.iterate(zombie => {
-                // Если зомби остановился (уперся), толкаем его в случайную сторону
                 if (Math.abs(zombie.body.velocity.x) < 5 && Math.abs(zombie.body.velocity.y) < 5) {
                     let angle = Phaser.Math.Between(0, 360);
                     this.physics.velocityFromAngle(angle, zombieSpeed, zombie.body.velocity);
-                } else if (Phaser.Math.Between(0, 100) === 0) { // Смена траектории на ходу
+                } else if (Phaser.Math.Between(0, 100) === 0) {
                     let angle = Phaser.Math.Between(0, 360);
                     this.physics.velocityFromAngle(angle, zombieSpeed, zombie.body.velocity);
                 }
