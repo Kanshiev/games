@@ -361,16 +361,55 @@
             }
         }
 
-        // Спавн квестовой руки внутри одной из комнат
+        // Спавн детализированной квестовой руки внутри одной из комнат
         spawnQuestHand() {
             let spawned = false, attempts = 0;
             while (!spawned && attempts < 1500) {
                 attempts++;
-                let tx = Phaser.Math.Between(1, this.mapGrid.length - 2), ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
-                // Ищем только пол внутри комнат (3), чтобы рука была спрятана
+                let tx = Phaser.Math.Between(1, this.mapGrid.length - 2);
+                let ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
+                
+                // Ищем только пол внутри комнат (3)
                 if (this.mapGrid[tx][ty] === 3) {
-                    let hand = this.add.circle(tx * 32 + 16, ty * 32 + 16, 8, 0xa020f0); // Фиолетовый
-                    this.questGroup.add(hand);
+                    let handX = tx * 32 + 16;
+                    let handY = ty * 32 + 16;
+                    
+                    // Создаем контейнер, чтобы объединить все части руки в один физический объект
+                    let handContainer = this.add.container(handX, handY);
+                    this.physics.add.existing(handContainer);
+                    handContainer.body.setSize(20, 20);
+                    
+                    // 1. Лужица крови под рукой (темно-красный приплюснутый круг)
+                    let blood = this.add.ellipse(0, 4, 22, 12, 0x8b0000);
+                    
+                    // 2. Ладонь (основной фиолетово-бледный круг)
+                    let palm = this.add.circle(0, 0, 7, 0xa020f0);
+                    
+                    // 3. Пальцы (маленькие вытянутые эллипсы или кружки, торчащие вверх)
+                    let finger1 = this.add.circle(-5, -4, 2, 0xb030ff); // Большой
+                    let finger2 = this.add.circle(-2, -7, 2, 0xb030ff); // Указательный
+                    let finger3 = this.add.circle(1, -8, 2.2, 0xb030ff); // Средний
+                    let finger4 = this.add.circle(4, -6, 2, 0xb030ff); // Безымянный
+                    let finger5 = this.add.circle(6, -3, 1.8, 0xb030ff); // Мизинец
+                    
+                    // 4. Обрубок запястья (светло-костлявая точка в основании)
+                    let bone = this.add.rectangle(0, 6, 4, 3, 0xeeeeee);
+
+                    // Сгружаем всё в контейнер
+                    handContainer.add([blood, palm, finger1, finger2, finger3, finger4, finger5, bone]);
+                    
+                    // Добавляем контейнер в квестовую группу, чтобы Агент мог его подобрать
+                    this.questGroup.add(handContainer);
+                    
+                    // Мягкое мерцание, чтобы предмет выделялся в темноте заброшки
+                    this.tweens.add({
+                        targets: handContainer,
+                        alpha: 0.6,
+                        duration: 800,
+                        yoyo: true,
+                        repeat: -1
+                    });
+
                     spawned = true;
                 }
             }
