@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Wasteland Agent: HTML UI</title>
+    <title>Wasteland Agent: Dialogues & Logs</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         body { 
@@ -15,30 +15,45 @@
             overflow: hidden; 
             font-family: 'Courier New', Courier, monospace;
             color: #00ff00;
+            gap: 20px; /* Отступ между всеми тремя колонками */
         }
         
-        /* Боковая панель интерфейса */
-        #ui-panel {
+        /* Левая панель интерфейса */
+        .side-panel {
             width: 260px;
-            height: 600px; /* Высота совпадает с высотой игры */
+            height: 600px; 
             background-color: #0a0a0a;
             border: 3px solid #222;
-            margin-right: 20px;
             padding: 20px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            gap: 20px;
             box-shadow: 0 0 15px rgba(0, 255, 0, 0.05);
         }
 
+        #ui-panel { gap: 20px; }
+
         .ui-section { border-bottom: 1px dashed #333; padding-bottom: 15px; }
         .ui-section:last-child { border-bottom: none; }
-        h3 { margin: 0 0 10px 0; color: #777; font-size: 16px; letter-spacing: 1px; }
-        .stat-row { margin-bottom: 8px; font-size: 15px; }
+        h3 { margin: 0 0 10px 0; color: #777; font-size: 16px; letter-spacing: 1px; text-align: center; }
+        .stat-row { margin-bottom: 8px; font-size: 14px; }
         .val { font-weight: bold; color: #fff; }
         .val-orange { font-weight: bold; color: #ffa500; }
         .val-blue { font-weight: bold; color: #00aaff; }
+
+        /* Правая панель логов */
+        #log-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 5px;
+        }
+        
+        /* Стилизация скроллбара для красоты */
+        #log-messages::-webkit-scrollbar { width: 5px; }
+        #log-messages::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; }
 
         #game-container { 
             border: 3px solid #222; 
@@ -48,8 +63,7 @@
 </head>
 <body>
 
-<!-- HTML Интерфейс вынесен за пределы канваса -->
-<div id="ui-panel">
+<div id="ui-panel" class="side-panel">
     <div class="ui-section">
         <h3>АГЕНТ</h3>
         <div class="stat-row">ЖИЗНИ: <span id="ui-lives" class="val">3</span> / 3</div>
@@ -63,12 +77,18 @@
     <div class="ui-section">
         <h3>БАЗА</h3>
         <div class="stat-row">Данные (синий ящик): <span id="ui-chest-intel" class="val-blue">0</span></div>
-        <div class="stat-row">Лут (оранжевый ящик): <span id="ui-chest-loot" class="val-orange">0</span></div>
+        <div class="stat-row">Лут (оранж ящик): <span id="ui-chest-loot" class="val-orange">0</span></div>
         <div class="stat-row" style="margin-top: 15px; color: #ffaa00;">Отдано Упырю: <span id="ui-npc-slugs" class="val">0</span></div>
     </div>
 </div>
 
 <div id="game-container"></div>
+
+<div id="log-panel" class="side-panel">
+    <h3>ЖУРНАЛ</h3>
+    <div id="log-messages">
+        </div>
+</div>
 
 <script>
     class GameScene extends Phaser.Scene {
@@ -93,11 +113,27 @@
                 chestLoot: 0,
                 npcSlugs: 0
             };
+            
             this.isInvulnerable = false;
+            this.lastNpcTalkTime = 0; // Таймер для общения
+
+            // Шутки Упыря
+            this.npcJokes = [
+                "Раньше меня тоже вела дорога приключений, а потом... кислотный дождь прожег мне колено.",
+                "Помню, строил автоматизацию умного дома. Теперь тут только умная плесень.",
+                "Знаешь, в чем плюс конца света? Больше не нужно платить за коммуналку!",
+                "Ты не видел мою левую руку? Кажется, тот утырок унес ее в сторону заброшек.",
+                "Свежее мясо! Ой, извини, старые привычки... Как сам?",
+                "Главное правило Пустоши: если оно светится и не кусается, значит, оно радиоактивное. А если кусается — беги.",
+                "Я бы предложил тебе чаю, но последняя заварка мутировала и сожрала мою кружку.",
+                "Эти слизни на вкус как жженая резина. Неси еще, я подсел.",
+                "Отличная погодка сегодня. Всего минус два радтаракана на квадратный метр.",
+                "Улыбнись, Агент. Хуже уже не будет. Ну, до прилета десанта зачистки."
+            ];
 
             this.mapGrid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
-
             this.walls = this.physics.add.staticGroup();
+            
             let bgGraphics = this.add.graphics();
             bgGraphics.fillStyle(0x111111, 1);
             bgGraphics.fillRect(0, 0, worldWidth, worldHeight);
@@ -204,9 +240,9 @@
             this.physics.add.collider(this.zombiesGroup, this.walls);
             this.physics.add.collider(this.zombiesGroup, this.baseBarrier);
 
-            this.physics.add.overlap(this.player, this.slugsGroup, (p, item) => this.collectItem(item, 'slugs'), null, this);
-            this.physics.add.overlap(this.player, this.intelGroup, (p, item) => this.collectItem(item, 'intel'), null, this);
-            this.physics.add.overlap(this.player, this.genLootGroup, (p, item) => this.collectItem(item, 'generalLoot'), null, this);
+            this.physics.add.overlap(this.player, this.slugsGroup, (p, item) => this.collectItem(item, 'slugs', 'Подобран слизень.', '#00ff00'), null, this);
+            this.physics.add.overlap(this.player, this.intelGroup, (p, item) => this.collectItem(item, 'intel', 'Найдены разведданные.', '#00aaff'), null, this);
+            this.physics.add.overlap(this.player, this.genLootGroup, (p, item) => this.collectItem(item, 'generalLoot', 'Собран лут.', '#ffa500'), null, this);
             this.physics.add.overlap(this.player, this.heartsGroup, this.collectHeart, null, this);
 
             this.physics.add.overlap(this.player, this.intelChest, this.depositIntel, null, this);
@@ -221,9 +257,22 @@
             this.cameras.main.setZoom(1.2);
 
             this.updateUI();
+            this.addLogMessage('Система', 'Связь установлена. Разведайте периметр.', '#aaa');
 
             this.cursors = this.input.keyboard.createCursorKeys();
             this.wasd = this.input.keyboard.addKeys('W,A,S,D');
+        }
+
+        // Функция добавления сообщений в Журнал
+        addLogMessage(sender, text, color) {
+            const logContainer = document.getElementById('log-messages');
+            const msgDiv = document.createElement('div');
+            msgDiv.style.fontSize = '12px';
+            msgDiv.style.lineHeight = '1.4';
+            msgDiv.innerHTML = `<span style="color:${color}; font-weight:bold;">[${sender}]:</span> <span style="color:#ddd;">${text}</span>`;
+            
+            logContainer.appendChild(msgDiv);
+            logContainer.scrollTop = logContainer.scrollHeight; // Автоматическая прокрутка вниз
         }
 
         spawnObjectsOnGrid(group, count, color, size, isZombie = false) {
@@ -247,10 +296,13 @@
             }
         }
 
-        collectItem(item, type) {
+        collectItem(item, type, logMsg, logColor) {
             item.destroy();
             this.playerStats[type]++;
             this.updateUI();
+            // Системные сообщения о подборе лута не выводим каждый раз, чтобы не заспамить,
+            // но если захочешь раскомментируй:
+            // this.addLogMessage('Система', logMsg, logColor);
         }
 
         collectHeart(player, heart) {
@@ -258,11 +310,13 @@
                 heart.destroy();
                 this.playerStats.lives++;
                 this.updateUI();
+                this.addLogMessage('Система', 'Здоровье восстановлено.', '#ff0055');
             }
         }
 
         depositIntel() {
             if (this.playerStats.intel > 0) {
+                this.addLogMessage('Система', `Сдано флешек: ${this.playerStats.intel}.`, '#00aaff');
                 this.playerStats.chestIntel += this.playerStats.intel;
                 this.playerStats.intel = 0;
                 this.updateUI();
@@ -271,6 +325,7 @@
 
         depositLoot() {
             if (this.playerStats.generalLoot > 0) {
+                this.addLogMessage('Система', `Сброшен лут: ${this.playerStats.generalLoot}.`, '#ffa500');
                 this.playerStats.chestLoot += this.playerStats.generalLoot;
                 this.playerStats.generalLoot = 0;
                 this.updateUI();
@@ -282,9 +337,12 @@
                 let amountToSpawn = this.playerStats.slugs * 3;
                 this.spawnObjectsOnGrid(this.genLootGroup, amountToSpawn, [0xffa500, 0xffff00], 6);
                 
+                this.addLogMessage('Упырь', `О, свежатина! Раскидал барахло по карте, как и договаривались.`, '#ffaa00');
+                
                 this.playerStats.npcSlugs += this.playerStats.slugs;
                 this.playerStats.slugs = 0;
                 this.updateUI();
+                this.lastNpcTalkTime = this.time.now; // Сбрасываем таймер разговора
             }
         }
 
@@ -293,9 +351,10 @@
 
             this.playerStats.lives--;
             this.updateUI();
+            this.addLogMessage('ВНИМАНИЕ', 'Получен урон!', '#ff0000');
 
             if (this.playerStats.lives <= 0) {
-                alert("Агент погиб! Возвращение на базу...");
+                this.addLogMessage('КРИТИЧЕСКИЙ СБОЙ', 'Агент эвакуирован на базу. Лут утерян.', '#ff0000');
                 this.playerStats.lives = 3;
                 this.playerStats.slugs = 0;
                 this.playerStats.intel = 0;
@@ -320,7 +379,6 @@
             }
         }
 
-        // Новая функция обновления HTML интерфейса вместо текста на холсте
         updateUI() {
             document.getElementById('ui-lives').innerText = this.playerStats.lives;
             document.getElementById('ui-slugs').innerText = this.playerStats.slugs;
@@ -340,6 +398,15 @@
 
             if (this.cursors.up.isDown || this.wasd.W.isDown) this.player.body.setVelocityY(-playerSpeed);
             else if (this.cursors.down.isDown || this.wasd.S.isDown) this.player.body.setVelocityY(playerSpeed);
+
+            // Обработка разговора с Упырем при приближении
+            let distToNpc = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y);
+            // Если Агент ближе 120 пикселей и прошло больше 10 секунд с последней фразы
+            if (distToNpc < 120 && this.time.now > this.lastNpcTalkTime + 10000) {
+                let randomJoke = Phaser.Utils.Array.GetRandom(this.npcJokes);
+                this.addLogMessage('Упырь', randomJoke, '#ffaa00');
+                this.lastNpcTalkTime = this.time.now;
+            }
 
             const zombieSpeed = 40; 
             this.zombiesGroup.children.iterate(zombie => {
