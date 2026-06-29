@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Wasteland Agent: Rebalance & Magnet</title>
+    <title>Wasteland Agent: Smart Magnet & Tactics</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         body { 
@@ -30,7 +30,6 @@
         .val-purple { font-weight: bold; color: #a020f0; }
         .val-red { font-weight: bold; color: #ff5555; }
         .val-green { font-weight: bold; color: #00ff00; }
-        .val-pink { font-weight: bold; color: #ff0055; }
 
         button {
             background: #111; border: 1px solid #333; color: #0f0; padding: 6px; 
@@ -155,12 +154,12 @@
             this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
             
             this.isInvulnerable = false;
+            this.isSuperMagnetActive = false; // Для чит-кода
             this.lastNpcTalkTime = 0;
             this.lastDroneAction = 0;
             this.lastInvFullMsgTime = 0;
             this.isNearChest = false;
-            
-            this.cheatBuffer = ''; // Буфер для чит-кода
+            this.cheatBuffer = '';
 
             this.npcJokes = [
                 "Пули — это хорошо. Но слизни надежнее. Они хотя бы не рикошетят.",
@@ -280,10 +279,20 @@
             this.tweens.add({ targets: npcBody, scaleY: 1.1, scaleX: 1.05, duration: 1500, yoyo: true, repeat: -1 });
             this.tweens.add({ targets: [npcHead, npcEye1, npcEye2], x: '+=2', duration: 100, yoyo: true, repeat: -1, repeatDelay: 3000 });
 
-            this.player = this.add.circle(baseXPx + baseSizePx/2, baseYPx + baseSizePx/2, 12, 0xffffff);
+            // === ВИЗУАЛ АГЕНТА В СЕРЫХ ТОНАХ ===
+            this.player = this.add.container(baseXPx + baseSizePx/2, baseYPx + baseSizePx/2);
             this.physics.add.existing(this.player);
+            this.player.body.setSize(24, 24); // Хитбокс
             this.player.body.setCollideWorldBounds(true);
             this.physics.add.collider(this.player, this.walls);
+
+            // Отрисовка бойца вид сверху (смотрит вправо по умолчанию, угол 0)
+            let pBackpack = this.add.rectangle(-8, 0, 10, 18, 0x333333); // Темный рюкзак сзади
+            let pShoulders = this.add.ellipse(0, 0, 20, 28, 0x555555); // Серые плечи
+            let pHead = this.add.circle(4, 0, 9, 0x888888); // Светло-серая каска
+            let pVisor = this.add.rectangle(11, 0, 6, 12, 0x111111); // Черный тактический визор спереди
+            
+            this.player.add([pBackpack, pShoulders, pHead, pVisor]);
 
             // Группы Лута и Врагов
             this.slugsGroup = this.physics.add.group();
@@ -299,7 +308,7 @@
             let wandererCount = Math.floor(20 * Math.pow(1.15, this.playerStats.level - 1));
 
             this.spawnObjectsOnGrid(this.slugsGroup, 25, 0x00ff00, 6);
-            this.spawnObjectsOnGrid(this.heartsGroup, 5, 0xff0055, 8); // Добавили аптечки на карту
+            this.spawnObjectsOnGrid(this.heartsGroup, 3, 0xff0055, 8); // Снижено кол-во стартовых аптечек до 3
             this.spawnIntelAndGuards(10);
             this.spawnWanderingZombies(wandererCount);
 
@@ -327,19 +336,29 @@
 
             // Обработка Чит-кода через клавиатуру
             this.input.keyboard.on('keydown', (event) => {
-                // Если нажата обычная буква
                 if (event.key.length === 1 && event.key.match(/[a-zA-Zа-яА-Я]/i)) {
                     this.cheatBuffer += event.key.toLowerCase();
-                    if (this.cheatBuffer.length > 4) {
-                        this.cheatBuffer = this.cheatBuffer.substring(this.cheatBuffer.length - 4);
-                    }
-                    if (this.cheatBuffer === 'popa' || this.cheatBuffer === 'зщзф') { // popa в русской раскладке
+                    if (this.cheatBuffer.length > 4) this.cheatBuffer = this.cheatBuffer.substring(this.cheatBuffer.length - 4);
+                    
+                    if (this.cheatBuffer === 'popa' || this.cheatBuffer === 'зщзф') { 
                         this.playerStats.coins += 5000;
                         this.playerStats.lives = 3;
                         this.playerStats.armor = 5;
-                        this.addLogMessage('ЧИТ', 'Режим бога активирован! +Деньги, Здоровье, Броня.', '#ff00ff');
+                        
+                        this.isSuperMagnetActive = true;
+                        this.player.body.checkCollision.none = true; // Сквозь стены
+                        this.player.setAlpha(0.6); // Призрак
+                        
+                        this.addLogMessage('ЧИТ', 'ВКЛЮЧЕН РЕЖИМ БОГА! (+Деньги, Броня, Сквозь стены, Супермагнит на 10 сек)', '#ff00ff');
                         this.updateUI();
                         this.cheatBuffer = '';
+
+                        this.time.delayedCall(10000, () => {
+                            this.isSuperMagnetActive = false;
+                            this.player.body.checkCollision.none = false;
+                            this.player.setAlpha(1);
+                            this.addLogMessage('ЧИТ', 'Действие чит-кода завершено.', '#ff00ff');
+                        });
                     }
                 }
             });
@@ -349,10 +368,16 @@
                     if (this.playerStats.ammo > 0) {
                         this.playerStats.ammo--;
                         this.updateUI();
-                        let bullet = this.add.circle(this.player.x, this.player.y, 4, 0xffd700);
+                        
+                        // Вычисляем угол и смещаем спавн пули к стволу (визору)
+                        let angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
+                        let bulletX = this.player.x + Math.cos(angle) * 16;
+                        let bulletY = this.player.y + Math.sin(angle) * 16;
+
+                        let bullet = this.add.circle(bulletX, bulletY, 4, 0xffd700);
                         this.physics.add.existing(bullet);
                         this.bulletsGroup.add(bullet);
-                        let angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
+                        
                         this.physics.velocityFromAngle(Phaser.Math.RadToDeg(angle), 600, bullet.body.velocity);
                     } else if (this.time.now > this.lastDroneAction + 1000) {
                         this.addLogMessage('Система', 'Нет патронов!', '#ff0000');
@@ -473,11 +498,7 @@
 
         collectItem(item, type, takesSlot) {
             if (takesSlot && this.getInventoryCount() >= this.playerStats.maxInventory) {
-                if (this.time.now > this.lastInvFullMsgTime + 2000) {
-                    this.addLogMessage('СИСТЕМА', `Инвентарь полон (${this.playerStats.maxInventory})!`, '#ff0000');
-                    this.lastInvFullMsgTime = this.time.now;
-                }
-                return;
+                return; // Игнорируем подбор
             }
             item.destroy();
             this.playerStats[type]++;
@@ -486,7 +507,6 @@
 
         collectCoin(coin) {
             coin.destroy();
-            // Даем от 1 до 3 монет за поднятие желтого кружка
             this.playerStats.coins += Phaser.Math.Between(1, 3);
             this.updateUI();
         }
@@ -501,19 +521,8 @@
         }
 
         collectArmor(player, armorItem) {
-            if (this.playerStats.armor >= 5) {
-                if (this.time.now > this.lastInvFullMsgTime + 2000) {
-                    this.addLogMessage('СИСТЕМА', 'Больше 5 пластин брони не нацепить.', '#ff0000');
-                    this.lastInvFullMsgTime = this.time.now;
-                }
-                return;
-            }
-            if (this.getInventoryCount() >= this.playerStats.maxInventory) {
-                if (this.time.now > this.lastInvFullMsgTime + 2000) {
-                    this.addLogMessage('СИСТЕМА', `Инвентарь полон!`, '#ff0000');
-                    this.lastInvFullMsgTime = this.time.now;
-                }
-                return;
+            if (this.playerStats.armor >= 5 || this.getInventoryCount() >= this.playerStats.maxInventory) {
+                return; // Игнорируем
             }
             armorItem.destroy();
             this.playerStats.armor++;
@@ -557,7 +566,7 @@
                 
                 for(let i=0; i<15; i++) {
                     let rand = Phaser.Math.Between(1, 100);
-                    if (rand <= 60) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5); // Больше монет в награду
+                    if (rand <= 60) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5); 
                     else if (rand <= 90) this.spawnObjectsOnGrid(this.chipsGroup, 1, 0x00ffff, 6); 
                     else this.spawnObjectsOnGrid(this.armorGroup, 1, 0xc0c0c0, 6); 
                 }
@@ -570,9 +579,9 @@
                 let amountToSpawn = this.playerStats.slugs * 2;
                 for(let i=0; i<amountToSpawn; i++) {
                     let rand = Phaser.Math.Between(1, 100);
-                    // Баланс лута с Упыря: 65% монеты, 25% чипы, 10% броня
-                    if (rand <= 65) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5);
-                    else if (rand <= 90) this.spawnObjectsOnGrid(this.chipsGroup, 1, 0x00ffff, 6);
+                    // Баланс: 60% монеты, 25% чипы, 15% броня
+                    if (rand <= 60) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5);
+                    else if (rand <= 85) this.spawnObjectsOnGrid(this.chipsGroup, 1, 0x00ffff, 6);
                     else this.spawnObjectsOnGrid(this.armorGroup, 1, 0xc0c0c0, 6);
                 }
                 this.addLogMessage('Упырь', `Держи ништяки, Агент! Раскидал по округе.`, '#ffaa00');
@@ -727,16 +736,19 @@
                 let slug = this.add.circle(zx, zy, 6, 0x00ff00);
                 this.slugsGroup.add(slug);
                 
-                // 60% шанс на монету с врага
                 if (Phaser.Math.Between(1, 100) <= 60) {
                     let coin = this.add.circle(zx + Phaser.Math.Between(-10, 10), zy + Phaser.Math.Between(-10, 10), 5, 0xffd700);
                     this.coinsGroup.add(coin);
                 }
                 
-                // 10% шанс на аптечку с врага
-                if (Phaser.Math.Between(1, 100) <= 10) {
+                if (Phaser.Math.Between(1, 100) <= 5) {
                     let heart = this.add.circle(zx + Phaser.Math.Between(-15, 15), zy + Phaser.Math.Between(-15, 15), 8, 0xff0055);
                     this.heartsGroup.add(heart);
+                }
+
+                if (Phaser.Math.Between(1, 100) <= 5) {
+                    let arm = this.add.circle(zx + Phaser.Math.Between(-15, 15), zy + Phaser.Math.Between(-15, 15), 6, 0xc0c0c0);
+                    this.armorGroup.add(arm);
                 }
             }
         }
@@ -855,28 +867,44 @@
             if (this.cursors.up.isDown || this.wasd.W.isDown) this.player.body.setVelocityY(-playerSpeed);
             else if (this.cursors.down.isDown || this.wasd.S.isDown) this.player.body.setVelocityY(playerSpeed);
 
-            // Логика МАГНИТА (Автосбор)
-            if (this.playerStats.magnetLevel > 0) {
-                let magnetRadius = 30 + (this.playerStats.magnetLevel * 40); // 70, 110, 150, 190, 230 пикселей
+            // Поворот Агента за курсором
+            let pointer = this.input.activePointer;
+            this.player.rotation = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
+
+            // Логика УМНОГО МАГНИТА
+            if (this.playerStats.magnetLevel > 0 || this.isSuperMagnetActive) {
+                let magnetRadius = this.isSuperMagnetActive ? 600 : (30 + (this.playerStats.magnetLevel * 40));
                 
-                const pullItems = (group) => {
+                let invFull = this.getInventoryCount() >= this.playerStats.maxInventory;
+                let hpFull = this.playerStats.lives >= 3;
+                let armorFull = this.playerStats.armor >= 5;
+
+                const pullItem = (group, condition) => {
                     group.children.iterate(item => {
                         if (item && item.body) {
                             let dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, item.x, item.y);
-                            if (dist < magnetRadius) {
-                                this.physics.moveToObject(item, this.player, 250);
+                            if (dist < magnetRadius && (condition || this.isSuperMagnetActive)) {
+                                this.physics.moveToObject(item, this.player, this.isSuperMagnetActive ? 500 : 250);
                             } else {
-                                item.body.setVelocity(0, 0); // Остановка если вышли из радиуса
+                                item.body.setVelocity(0, 0); // Падает на землю, если условия не выполнены
                             }
                         }
                     });
                 };
-                pullItems(this.slugsGroup);
-                pullItems(this.coinsGroup);
-                pullItems(this.chipsGroup);
-                pullItems(this.armorGroup);
-                pullItems(this.heartsGroup);
-                pullItems(this.intelGroup);
+
+                // Тащим с условиями
+                pullItem(this.slugsGroup, !invFull);
+                pullItem(this.chipsGroup, !invFull);
+                pullItem(this.armorGroup, !invFull && !armorFull);
+                pullItem(this.heartsGroup, !hpFull);
+                pullItem(this.coinsGroup, true); // Деньги тащим всегда
+                
+                // Флешки тащим ТОЛЬКО если активен чит
+                if (this.isSuperMagnetActive) {
+                    pullItem(this.intelGroup, true);
+                } else {
+                    this.intelGroup.children.iterate(item => { if(item && item.body) item.body.setVelocity(0,0); });
+                }
             }
 
             let distToChest = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.chest.x, this.chest.y);
