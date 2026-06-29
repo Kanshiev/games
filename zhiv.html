@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Wasteland Agent: Survival & Quests</title>
+    <title>Wasteland Agent: Ranks & Chest</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         body { 
@@ -11,32 +11,41 @@
             font-family: 'Courier New', Courier, monospace; color: #00ff00; gap: 20px; 
         }
         .side-panel {
-            width: 280px; height: 600px; background-color: #0a0a0a; border: 3px solid #222;
+            width: 300px; height: 600px; background-color: #0a0a0a; border: 3px solid #222;
             padding: 15px; box-sizing: border-box; display: flex; flex-direction: column;
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.05); gap: 10px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.05); gap: 10px; overflow-y: auto;
         }
+        .side-panel::-webkit-scrollbar { width: 5px; }
+        .side-panel::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; }
+        
         .ui-section { border-bottom: 1px dashed #333; padding-bottom: 10px; }
         .ui-section:last-child { border-bottom: none; }
         h3 { margin: 0 0 8px 0; color: #777; font-size: 15px; text-align: center; }
         .stat-row { margin-bottom: 5px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+        
         .val { font-weight: bold; color: #fff; }
         .val-gold { font-weight: bold; color: #ffd700; }
         .val-cyan { font-weight: bold; color: #00ffff; }
         .val-grey { font-weight: bold; color: #c0c0c0; }
         .val-purple { font-weight: bold; color: #a020f0; }
         .val-red { font-weight: bold; color: #ff5555; }
+        .val-green { font-weight: bold; color: #00ff00; }
 
         button {
-            background: #111; border: 1px solid #333; color: #0f0; padding: 5px; 
+            background: #111; border: 1px solid #333; color: #0f0; padding: 6px; 
             cursor: pointer; font-family: inherit; width: 100%; margin-top: 5px; transition: 0.2s;
+            font-size: 12px;
         }
         button:hover { background: #222; color: #fff; }
         button:disabled { border-color: #333; color: #444; cursor: not-allowed; }
         
-        .btn-evac { background: #400; border-color: #f00; color: #f00; font-weight: bold; padding: 10px; display: none; }
+        .btn-evac { background: #400; border-color: #f00; color: #f00; font-weight: bold; display: none; }
         .btn-evac:hover { background: #f00; color: #fff; }
-        .btn-quest { background: #316; border-color: #a020f0; color: #e0a0ff; }
-        .btn-quest:hover { background: #528; color: #fff; }
+        .btn-upgrade { background: #330; border-color: #aa0; color: #ff0; }
+        .btn-upgrade:hover { background: #550; }
+        .btn-chest { background: #123; border-color: #048; color: #0af; width: 48%; }
+
+        .chest-controls { display: flex; justify-content: space-between; margin-top: 5px; }
 
         #log-messages { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
         #log-messages::-webkit-scrollbar { width: 5px; }
@@ -48,10 +57,12 @@
 
 <div id="ui-panel" class="side-panel">
     <div class="ui-section">
-        <h3>АГЕНТ (Уровень <span id="ui-level" class="val-cyan">1</span>)</h3>
+        <h3>АГЕНТ (Звание: <span id="ui-rank" class="val-cyan">Рядовой</span>)</h3>
+        <div class="stat-row"><span>Карта:</span> <span id="ui-level" class="val">1</span></div>
         <div class="stat-row"><span>❤️ Здоровье:</span> <span id="ui-lives" class="val">3 / 3</span></div>
         <div class="stat-row"><span>💀 Убито нечисти:</span> <span id="ui-kills" class="val-red">0</span></div>
         <button onclick="window.gameScene.buyMedkit()">Купить Аптечку (10 монет)</button>
+        <button id="btn-upgrade-bag" class="btn-upgrade" style="display:none;" onclick="window.gameScene.upgradeBackpack()"></button>
     </div>
     
     <div class="ui-section" id="weapon-section" style="display: none;">
@@ -60,23 +71,26 @@
     </div>
 
     <div class="ui-section">
-        <h3>ИНВЕНТАРЬ (<span id="ui-inv-count" class="val">0</span>/25)</h3>
-        <div class="stat-row"><span>Слизней:</span> <span id="ui-slugs" class="val">0</span></div>
-        <div class="stat-row"><span>🛡️ Броня:</span> <span id="ui-armor" class="val-grey">0</span></div>
+        <h3>ИНВЕНТАРЬ (<span id="ui-inv-count" class="val">0</span>/<span id="ui-inv-max" class="val">25</span>)</h3>
+        <div class="stat-row"><span>Слизней:</span> <span id="ui-slugs" class="val-green">0</span></div>
+        <div class="stat-row"><span>🛡️ Броня:</span> <span id="ui-armor" class="val-grey">0 / 5</span></div>
         <div class="stat-row"><span>Микросхем:</span> <span id="ui-chips" class="val-cyan">0</span></div>
-        <div class="stat-row" style="color:#aaa; font-size: 11px;">(Вне лимита) Монеток: <span id="ui-coins" class="val-gold">0</span></div>
-    </div>
-
-    <div class="ui-section" id="quest-section">
-        <h3>КВЕСТ УПЫРЯ</h3>
-        <div class="stat-row"><span>Статус:</span> <span id="ui-quest-status" class="val-purple">Не начат</span></div>
-        <button id="btn-accept-quest" class="btn-quest" style="display:none;" onclick="window.gameScene.acceptQuest()">Принять квест</button>
+        <div class="stat-row" style="color:#aaa; font-size: 11px;">Монеток (Вне лимита): <span id="ui-coins" class="val-gold">0</span></div>
+        <div class="stat-row" style="color:#aaa; font-size: 11px;">Флешек (Вне лимита): <span id="ui-intel" class="val-cyan">0 / 10</span></div>
     </div>
 
     <div class="ui-section">
-        <h3>МИССИЯ</h3>
-        <div class="stat-row"><span>Флешек собрано:</span> <span id="ui-intel" class="val-cyan">0 / 10</span></div>
-        <button id="btn-finish" class="btn-evac" onclick="window.gameScene.finishMission()">ВЫЗВАТЬ ОПЕРГРУППУ</button>
+        <h3>СУНДУК (На базе)</h3>
+        <div class="stat-row"><span>Слизней в сундуке:</span> <span id="ui-chest-slugs" class="val-green">0</span></div>
+        <div class="stat-row"><span>Микросхем в сундуке:</span> <span id="ui-chest-chips" class="val-cyan">0</span></div>
+        <div class="chest-controls">
+            <button class="btn-chest" id="btn-chest-put" disabled onclick="window.gameScene.chestPut()">Скинуть</button>
+            <button class="btn-chest" id="btn-chest-take" disabled onclick="window.gameScene.chestTake()">Забрать</button>
+        </div>
+    </div>
+
+    <div class="ui-section">
+        <button id="btn-finish" class="btn-evac" onclick="window.gameScene.finishMission()">ВЫЗВАТЬ ОПЕРГРУППУ (10 флешек)</button>
     </div>
 </div>
 
@@ -92,22 +106,31 @@
         constructor() { super('GameScene'); }
 
         init(data) {
+            this.RANKS = [
+                { name: "Рядовой", reqKills: 0, invLimit: 25, cost: 0 },
+                { name: "Ефрейтор", reqKills: 50, invLimit: 35, cost: 50 },
+                { name: "Сержант", reqKills: 120, invLimit: 50, cost: 120 },
+                { name: "Прапорщик", reqKills: 250, invLimit: 65, cost: 300 },
+                { name: "Лейтенант", reqKills: 450, invLimit: 80, cost: 500 },
+                { name: "Капитан Пустоши", reqKills: 700, invLimit: 100, cost: 800 }
+            ];
+
             if (data && data.playerStats) {
                 this.playerStats = data.playerStats;
             } else {
                 this.playerStats = {
-                    level: 1, kills: 0,
+                    level: 1, kills: 0, rankIndex: 0, maxInventory: 25,
                     lives: 3, armor: 0, slugs: 0, intel: 0, coins: 0, chips: 0,
                     hasWeapon: false, ammo: 0, npcSlugs: 0,
-                    questState: 0, // 0 - не начат, 1 - предложен, 2 - принят (рука заспавнена), 3 - выполнен
-                    hasHand: false
+                    chestSlugs: 0, chestChips: 0, // Данные сундука
+                    questState: 0, hasHand: false
                 };
             }
-            this.MAX_INVENTORY = 25;
         }
 
         getInventoryCount() {
-            return this.playerStats.slugs + this.playerStats.intel + this.playerStats.armor + this.playerStats.chips + (this.playerStats.hasHand ? 1 : 0);
+            // Флешки и монеты не занимают место. Броня занимает.
+            return this.playerStats.slugs + this.playerStats.armor + this.playerStats.chips + (this.playerStats.hasHand ? 1 : 0);
         }
 
         create() {
@@ -121,6 +144,7 @@
             this.lastNpcTalkTime = 0;
             this.lastDroneAction = 0;
             this.lastInvFullMsgTime = 0;
+            this.isNearChest = false;
 
             this.npcJokes = [
                 "Пули — это хорошо. Но слизни надежнее. Они хотя бы не рикошетят.",
@@ -159,7 +183,7 @@
             bgGraphics.fillStyle(0x111111, 1);
             bgGraphics.fillRect(0, 0, worldWidth, worldHeight);
 
-            // База
+            // === БАЗА ===
             const baseStart = Math.floor(GRID_SIZE / 2) - 5;
             const baseSizePx = 10 * TILE_SIZE;
             const baseXPx = baseStart * TILE_SIZE;
@@ -215,14 +239,38 @@
                 }
             }
 
-            // Объекты базы
-            this.npc = this.add.rectangle(baseXPx + baseSizePx - 64, baseYPx + baseSizePx/2, 24, 24, 0xffaa00);
-            this.dronePad = this.add.rectangle(baseXPx + 64, baseYPx + baseSizePx/2, 40, 40, 0x555555);
-            
-            this.physics.add.existing(this.npc, true);
+            // === ВИЗУАЛИЗАЦИЯ ОБЪЕКТОВ БАЗЫ ===
+
+            // Дрон площадка
+            this.dronePad = this.add.rectangle(baseXPx + 50, baseYPx + baseSizePx/2, 40, 40, 0x555555);
             this.physics.add.existing(this.dronePad, true);
-            this.add.text(this.npc.x - 20, this.npc.y - 25, 'Упырь', { fontSize: '11px', fill: '#ffaa00' });
-            this.add.text(this.dronePad.x - 22, this.dronePad.y - 8, 'ДРОН', { fontSize: '14px', fill: '#00ffff', fontStyle: 'bold' });
+            this.add.text(this.dronePad.x - 16, this.dronePad.y - 6, 'H', { fontSize: '18px', fill: '#00ffff', fontStyle: 'bold' });
+
+            // Сундук (Деревянный ящик с металлическими углами)
+            this.chest = this.add.container(baseXPx + baseSizePx/2, baseYPx + 50);
+            let chestBase = this.add.rectangle(0, 0, 40, 25, 0x8b4513);
+            let chestLid = this.add.rectangle(0, -10, 40, 5, 0x5c3a21);
+            let chestLock = this.add.circle(0, -3, 3, 0xffd700);
+            this.chest.add([chestBase, chestLid, chestLock]);
+            this.physics.add.existing(this.chest, true);
+            this.chest.body.setSize(40, 25);
+            this.add.text(this.chest.x - 20, this.chest.y - 25, 'СУНДУК', { fontSize: '10px', fill: '#fff' });
+
+            // Визуализация Упыря
+            this.npc = this.add.container(baseXPx + baseSizePx - 50, baseYPx + baseSizePx/2);
+            this.physics.add.existing(this.npc, true);
+            this.npc.body.setSize(30, 30);
+            
+            let npcBody = this.add.ellipse(0, 5, 24, 28, 0x4a5a4a); // сгорбленное тело
+            let npcHead = this.add.circle(0, -10, 10, 0x5a6a5a); // бледная голова
+            let npcEye1 = this.add.circle(-4, -12, 2, 0xffaa00); // светящийся глаз
+            let npcEye2 = this.add.circle(4, -12, 2, 0xffaa00);
+            this.npc.add([npcBody, npcHead, npcEye1, npcEye2]);
+            this.add.text(this.npc.x - 15, this.npc.y - 30, 'Упырь', { fontSize: '11px', fill: '#ffaa00' });
+
+            // Анимации Упыря
+            this.tweens.add({ targets: npcBody, scaleY: 1.1, scaleX: 1.05, duration: 1500, yoyo: true, repeat: -1 });
+            this.tweens.add({ targets: [npcHead, npcEye1, npcEye2], x: '+=2', duration: 100, yoyo: true, repeat: -1, repeatDelay: 3000 });
 
             // Игрок
             this.player = this.add.circle(baseXPx + baseSizePx/2, baseYPx + baseSizePx/2, 12, 0xffffff);
@@ -240,14 +288,12 @@
             this.bulletsGroup = this.physics.add.group();
             this.questGroup = this.physics.add.group();
 
-            // Спавн с учетом Уровня (+15% врагов каждый уровень)
             let wandererCount = Math.floor(20 * Math.pow(1.15, this.playerStats.level - 1));
 
             this.spawnObjectsOnGrid(this.slugsGroup, 25, 0x00ff00, 6);
             this.spawnIntelAndGuards(10);
             this.spawnWanderingZombies(wandererCount);
 
-            // Если квест уже был принят ранее, но рука не доставлена, спавним её.
             if (this.playerStats.questState === 2 && !this.playerStats.hasHand) {
                 this.spawnQuestHand();
             }
@@ -258,10 +304,10 @@
             this.physics.add.collider(this.bulletsGroup, this.walls, (bullet) => bullet.destroy());
 
             this.physics.add.overlap(this.player, this.slugsGroup, (p, i) => this.collectItem(i, 'slugs', true), null, this);
-            this.physics.add.overlap(this.player, this.intelGroup, (p, i) => this.collectItem(i, 'intel', true), null, this);
+            this.physics.add.overlap(this.player, this.intelGroup, (p, i) => this.collectItem(i, 'intel', false), null, this); // Флешки не занимают место
             this.physics.add.overlap(this.player, this.coinsGroup, (p, i) => this.collectItem(i, 'coins', false), null, this);
             this.physics.add.overlap(this.player, this.chipsGroup, (p, i) => this.collectItem(i, 'chips', true), null, this);
-            this.physics.add.overlap(this.player, this.armorGroup, (p, i) => this.collectItem(i, 'armor', true), null, this);
+            this.physics.add.overlap(this.player, this.armorGroup, this.collectArmor, null, this);
             this.physics.add.overlap(this.player, this.questGroup, this.collectHand, null, this);
 
             this.physics.add.overlap(this.player, this.npc, this.interactNPC, null, this);
@@ -292,6 +338,7 @@
 
             this.addLogMessage('Система', `Уровень ${this.playerStats.level}. Высадка прошла успешно.`, '#aaa');
             if (this.playerStats.hasWeapon) document.getElementById('weapon-section').style.display = 'block';
+            this.checkRankUp();
             this.updateUI();
 
             this.cursors = this.input.keyboard.createCursorKeys();
@@ -320,7 +367,6 @@
             }
         }
 
-        // Здоровье зомби скалируется (+10% каждый уровень)
         getZombieHp() {
             let baseHp = Phaser.Math.Between(2, 4);
             return Math.floor(baseHp * Math.pow(1.10, this.playerStats.level - 1));
@@ -332,26 +378,18 @@
                 attempts++;
                 let tx = Phaser.Math.Between(1, this.mapGrid.length - 2), ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
                 if (this.mapGrid[tx][ty] === 0 || this.mapGrid[tx][ty] === 3) {
-                    let intelX = tx * 32 + 16;
-                    let intelY = ty * 32 + 16;
-                    
+                    let intelX = tx * 32 + 16, intelY = ty * 32 + 16;
                     let intel = this.add.circle(intelX, intelY, 6, 0x0000ff);
                     this.intelGroup.add(intel);
                     
                     let guardCount = Phaser.Math.Between(2, 3);
                     for(let i=0; i<guardCount; i++) {
-                        let ox = intelX + Phaser.Math.Between(-20, 20);
-                        let oy = intelY + Phaser.Math.Between(-20, 20);
-                        let guard = this.add.circle(ox, oy, 10, 0xff0000);
+                        let guard = this.add.circle(intelX + Phaser.Math.Between(-20, 20), intelY + Phaser.Math.Between(-20, 20), 10, 0xff0000);
                         this.physics.add.existing(guard);
                         guard.body.setCollideWorldBounds(true);
                         guard.body.setBounce(1);
                         guard.hp = this.getZombieHp();
-                        
-                        guard.isGuard = true;
-                        guard.guardX = intelX;
-                        guard.guardY = intelY;
-                        guard.isChasing = false;
+                        guard.isGuard = true; guard.guardX = intelX; guard.guardY = intelY; guard.isChasing = false;
                         this.zombiesGroup.add(guard);
                     }
                     spawned++;
@@ -370,8 +408,7 @@
                     zombie.body.setCollideWorldBounds(true);
                     zombie.body.setBounce(1);
                     zombie.hp = this.getZombieHp();
-                    zombie.isGuard = false;
-                    zombie.isChasing = false;
+                    zombie.isGuard = false; zombie.isChasing = false;
                     this.zombiesGroup.add(zombie);
                     spawned++;
                 }
@@ -384,10 +421,7 @@
                 attempts++;
                 let tx = Phaser.Math.Between(1, this.mapGrid.length - 2), ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
                 if (this.mapGrid[tx][ty] === 3) {
-                    let handX = tx * 32 + 16;
-                    let handY = ty * 32 + 16;
-                    
-                    let handContainer = this.add.container(handX, handY);
+                    let handContainer = this.add.container(tx * 32 + 16, ty * 32 + 16);
                     this.physics.add.existing(handContainer);
                     handContainer.body.setSize(20, 20);
                     
@@ -402,7 +436,6 @@
 
                     handContainer.add([blood, palm, finger1, finger2, finger3, finger4, finger5, bone]);
                     this.questGroup.add(handContainer);
-                    
                     this.tweens.add({ targets: handContainer, alpha: 0.6, duration: 800, yoyo: true, repeat: -1 });
                     spawned = true;
                 }
@@ -410,9 +443,9 @@
         }
 
         collectItem(item, type, takesSlot) {
-            if (takesSlot && this.getInventoryCount() >= this.MAX_INVENTORY) {
+            if (takesSlot && this.getInventoryCount() >= this.playerStats.maxInventory) {
                 if (this.time.now > this.lastInvFullMsgTime + 2000) {
-                    this.addLogMessage('СИСТЕМА', 'Инвентарь полон (25/25)!', '#ff0000');
+                    this.addLogMessage('СИСТЕМА', `Инвентарь полон (${this.playerStats.maxInventory})!`, '#ff0000');
                     this.lastInvFullMsgTime = this.time.now;
                 }
                 return;
@@ -422,42 +455,52 @@
             this.updateUI();
         }
 
-        collectHand(player, hand) {
-            if (this.getInventoryCount() >= this.MAX_INVENTORY) {
+        collectArmor(player, armorItem) {
+            // Ограничение брони на персонаже: строго 5
+            if (this.playerStats.armor >= 5) {
                 if (this.time.now > this.lastInvFullMsgTime + 2000) {
-                    this.addLogMessage('СИСТЕМА', 'Инвентарь полон! Освободите место для Руки.', '#ff0000');
+                    this.addLogMessage('СИСТЕМА', 'Больше 5 пластин брони не нацепить.', '#ff0000');
+                    this.lastInvFullMsgTime = this.time.now;
+                }
+                return;
+            }
+            if (this.getInventoryCount() >= this.playerStats.maxInventory) {
+                if (this.time.now > this.lastInvFullMsgTime + 2000) {
+                    this.addLogMessage('СИСТЕМА', `Инвентарь полон!`, '#ff0000');
+                    this.lastInvFullMsgTime = this.time.now;
+                }
+                return;
+            }
+            armorItem.destroy();
+            this.playerStats.armor++;
+            this.updateUI();
+        }
+
+        collectHand(player, hand) {
+            if (this.getInventoryCount() >= this.playerStats.maxInventory) {
+                if (this.time.now > this.lastInvFullMsgTime + 2000) {
+                    this.addLogMessage('СИСТЕМА', 'Освободите место для Руки.', '#ff0000');
                     this.lastInvFullMsgTime = this.time.now;
                 }
                 return;
             }
             hand.destroy();
             this.playerStats.hasHand = true;
-            this.addLogMessage('СИСТЕМА', 'Найдена оторванная рука. Кажется, она принадлежит Упырю.', '#a020f0');
-            this.updateUI();
-        }
-
-        acceptQuest() {
-            this.playerStats.questState = 2; // Принят
-            document.getElementById('btn-accept-quest').style.display = 'none';
-            this.addLogMessage('Упырь', 'Отлично! Ищи в заброшках. Вернешь — озолочу.', '#ffaa00');
-            this.spawnQuestHand();
+            this.addLogMessage('СИСТЕМА', 'Найдена оторванная рука.', '#a020f0');
             this.updateUI();
         }
 
         interactNPC() {
-            // Инициализация квеста
             if (this.playerStats.questState === 0) {
                 this.addLogMessage('Упырь', 'Агент, тут такое дело... Я руку левую посеял. Поможешь найти?', '#ffaa00');
-                this.playerStats.questState = 1; // Предложен
-                document.getElementById('btn-accept-quest').style.display = 'block';
+                this.playerStats.questState = 1; 
                 this.updateUI();
                 return;
             }
 
-            // Сдача квеста
             if (this.playerStats.hasHand) {
                 this.playerStats.hasHand = false;
-                this.playerStats.questState = 3; // Выполнен
+                this.playerStats.questState = 3; 
                 this.addLogMessage('Упырь', 'МОЯ РУКА! Я думал, её сожрали! Держи царский подгон из заначки!', '#a020f0');
                 
                 for(let i=0; i<15; i++) {
@@ -471,7 +514,6 @@
                 return;
             }
 
-            // Обычный обмен слизней (1 слизень = 2 предмета)
             if (this.playerStats.slugs > 0) {
                 let amountToSpawn = this.playerStats.slugs * 2;
                 for(let i=0; i<amountToSpawn; i++) {
@@ -485,6 +527,42 @@
                 this.playerStats.slugs = 0;
                 this.updateUI();
                 this.lastNpcTalkTime = this.time.now;
+            }
+        }
+
+        chestPut() {
+            if (!this.isNearChest) return;
+            if (this.playerStats.slugs > 0 || this.playerStats.chips > 0) {
+                this.playerStats.chestSlugs += this.playerStats.slugs;
+                this.playerStats.chestChips += this.playerStats.chips;
+                this.playerStats.slugs = 0;
+                this.playerStats.chips = 0;
+                this.addLogMessage('СУНДУК', 'Ресурсы сохранены.', '#8b4513');
+                this.updateUI();
+            }
+        }
+
+        chestTake() {
+            if (!this.isNearChest) return;
+            let spaceLeft = this.playerStats.maxInventory - this.getInventoryCount();
+            if (spaceLeft <= 0) {
+                this.addLogMessage('СУНДУК', 'Инвентарь полон!', '#ff0000');
+                return;
+            }
+
+            // Логика забора: сначала микросхемы, потом слизни
+            let takenChips = Math.min(this.playerStats.chestChips, spaceLeft);
+            this.playerStats.chips += takenChips;
+            this.playerStats.chestChips -= takenChips;
+            spaceLeft -= takenChips;
+
+            let takenSlugs = Math.min(this.playerStats.chestSlugs, spaceLeft);
+            this.playerStats.slugs += takenSlugs;
+            this.playerStats.chestSlugs -= takenSlugs;
+
+            if (takenChips > 0 || takenSlugs > 0) {
+                this.addLogMessage('СУНДУК', 'Ресурсы извлечены.', '#8b4513');
+                this.updateUI();
             }
         }
 
@@ -503,6 +581,31 @@
             }
         }
 
+        checkRankUp() {
+            // Проверяем, достигли ли мы киллов для следующего ранга
+            let nextRankIndex = this.playerStats.rankIndex + 1;
+            if (nextRankIndex < this.RANKS.length) {
+                if (this.playerStats.kills >= this.RANKS[nextRankIndex].reqKills) {
+                    this.playerStats.rankIndex = nextRankIndex;
+                    this.addLogMessage('ШТАБ', `Поздравляем! Новое звание: ${this.RANKS[this.playerStats.rankIndex].name}. Доступно расширение инвентаря.`, '#00ff00');
+                }
+            }
+        }
+
+        upgradeBackpack() {
+            let rankData = this.RANKS[this.playerStats.rankIndex];
+            if (this.playerStats.maxInventory < rankData.invLimit) {
+                if (this.playerStats.coins >= rankData.cost) {
+                    this.playerStats.coins -= rankData.cost;
+                    this.playerStats.maxInventory = rankData.invLimit;
+                    this.addLogMessage('СИСТЕМА', `Рюкзак расширен до ${rankData.invLimit} слотов!`, '#00ff00');
+                    this.updateUI();
+                } else {
+                    this.addLogMessage('СИСТЕМА', `Не хватает монет для улучшения (нужно ${rankData.cost}).`, '#ff0000');
+                }
+            }
+        }
+
         callDrone() {
             if (this.time.now < this.lastDroneAction + 1500) return;
 
@@ -515,7 +618,7 @@
                     this.addLogMessage('ДРОН', 'Пистолет и 20 патронов доставлены.', '#00ffff');
                     this.updateUI();
                 } else {
-                    this.addLogMessage('ДРОН', 'Отказ. Требуется 5 микросхем для оружия.', '#555');
+                    this.addLogMessage('ДРОН', 'Отказ. Требуется 5 микросхем.', '#555');
                 }
             } else {
                 if (this.playerStats.chips >= 2) {
@@ -524,7 +627,7 @@
                     this.addLogMessage('ДРОН', '+20 патронов.', '#00ffff');
                     this.updateUI();
                 } else {
-                    this.addLogMessage('ДРОН', 'Отказ. Требуется 2 микросхемы для патронов.', '#555');
+                    this.addLogMessage('ДРОН', 'Отказ. Требуется 2 микросхемы.', '#555');
                 }
             }
             this.lastDroneAction = this.time.now;
@@ -540,6 +643,7 @@
                 let zx = zombie.x; let zy = zombie.y;
                 zombie.destroy();
                 this.playerStats.kills++;
+                this.checkRankUp();
                 this.updateUI();
                 
                 let slug = this.add.circle(zx, zy, 6, 0x00ff00);
@@ -595,34 +699,35 @@
         }
 
         updateUI() {
+            let rankData = this.RANKS[this.playerStats.rankIndex];
+            
+            document.getElementById('ui-rank').innerText = rankData.name;
             document.getElementById('ui-level').innerText = this.playerStats.level;
             document.getElementById('ui-kills').innerText = this.playerStats.kills;
             document.getElementById('ui-lives').innerText = `${this.playerStats.lives} / 3`;
             document.getElementById('ui-inv-count').innerText = this.getInventoryCount();
+            document.getElementById('ui-inv-max').innerText = this.playerStats.maxInventory;
             
-            document.getElementById('ui-armor').innerText = this.playerStats.armor;
+            document.getElementById('ui-armor').innerText = `${this.playerStats.armor} / 5`;
             document.getElementById('ui-slugs').innerText = this.playerStats.slugs;
             document.getElementById('ui-coins').innerText = this.playerStats.coins;
             document.getElementById('ui-chips').innerText = this.playerStats.chips;
             document.getElementById('ui-intel').innerText = `${this.playerStats.intel} / 10`;
             document.getElementById('ui-ammo').innerText = this.playerStats.ammo;
             
-            // Логика отображения Квеста
-            let questSec = document.getElementById('quest-section');
-            let qStatus = document.getElementById('ui-quest-status');
-            
-            if (this.playerStats.level > 1 && this.playerStats.questState === 3) {
-                questSec.style.display = 'none'; // Скрываем после 1 уровня, если выполнен
+            document.getElementById('ui-chest-slugs').innerText = this.playerStats.chestSlugs;
+            document.getElementById('ui-chest-chips').innerText = this.playerStats.chestChips;
+
+            // Кнопка апгрейда
+            let btnUpgrade = document.getElementById('btn-upgrade-bag');
+            if (this.playerStats.maxInventory < rankData.invLimit) {
+                btnUpgrade.style.display = 'block';
+                btnUpgrade.innerText = `Улучшить рюкзак (+ до ${rankData.invLimit}) за ${rankData.cost} монет`;
             } else {
-                questSec.style.display = 'block';
-                if (this.playerStats.questState === 0) qStatus.innerText = "Не начат";
-                else if (this.playerStats.questState === 1) qStatus.innerText = "Ждет ответа";
-                else if (this.playerStats.questState === 2) qStatus.innerText = (this.playerStats.hasHand ? "Найдена" : "В процессе");
-                else if (this.playerStats.questState === 3) qStatus.innerText = "Выполнен";
+                btnUpgrade.style.display = 'none';
             }
 
-            let btnFinish = document.getElementById('btn-finish');
-            btnFinish.style.display = (this.playerStats.intel >= 10) ? 'block' : 'none';
+            document.getElementById('btn-finish').style.display = (this.playerStats.intel >= 10) ? 'block' : 'none';
         }
 
         update() {
@@ -635,33 +740,33 @@
             if (this.cursors.up.isDown || this.wasd.W.isDown) this.player.body.setVelocityY(-playerSpeed);
             else if (this.cursors.down.isDown || this.wasd.S.isDown) this.player.body.setVelocityY(playerSpeed);
 
+            // Логика Сундука
+            let distToChest = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.chest.x, this.chest.y);
+            this.isNearChest = (distToChest < 50);
+            document.getElementById('btn-chest-put').disabled = !this.isNearChest;
+            document.getElementById('btn-chest-take').disabled = !this.isNearChest;
+
+            // Логика Упыря
             let distToNpc = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y);
             if (distToNpc < 120 && this.time.now > this.lastNpcTalkTime + 12000) {
-                if (this.playerStats.questState === 0) {
-                    this.interactNPC(); // Авто-вызов диалога квеста
-                } else {
-                    let joke = Phaser.Utils.Array.GetRandom(this.npcJokes);
-                    this.addLogMessage('Упырь', joke, '#ffaa00');
-                    this.lastNpcTalkTime = this.time.now;
-                }
+                let joke = Phaser.Utils.Array.GetRandom(this.npcJokes);
+                this.addLogMessage('Упырь', joke, '#ffaa00');
+                this.lastNpcTalkTime = this.time.now;
             }
 
-            // Умная логика Зомби с Агрессией
+            // Умная логика Зомби
             const zombieSpeed = 40; 
             const aggroSpeed = 70;
             
             this.zombiesGroup.children.iterate(zombie => {
                 let distToPlayer = Phaser.Math.Distance.Between(zombie.x, zombie.y, this.player.x, this.player.y);
                 
-                // Проверка Агрессии
                 if (distToPlayer < 150) zombie.isChasing = true;
                 else if (distToPlayer > 250) zombie.isChasing = false;
 
                 if (zombie.isChasing) {
-                    // Преследование игрока
                     this.physics.moveToObject(zombie, this.player, aggroSpeed);
                 } else if (zombie.isGuard) {
-                    // Патруль
                     let distToGuardPoint = Phaser.Math.Distance.Between(zombie.x, zombie.y, zombie.guardX, zombie.guardY);
                     if (distToGuardPoint > 80) {
                         this.physics.moveTo(zombie, zombie.guardX, zombie.guardY, zombieSpeed);
@@ -670,7 +775,6 @@
                         this.physics.velocityFromAngle(angle, zombieSpeed, zombie.body.velocity);
                     }
                 } else {
-                    // Обычное брождение
                     if (Math.abs(zombie.body.velocity.x) < 5 && Math.abs(zombie.body.velocity.y) < 5) {
                         let angle = Phaser.Math.Between(0, 360);
                         this.physics.velocityFromAngle(angle, zombieSpeed, zombie.body.velocity);
