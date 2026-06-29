@@ -2,294 +2,121 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Wasteland Agent</title>
+    <title>Wasteland Agent: Procedural Engine</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #111;
-            color: #0f0;
-            font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-        #ui-layer {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            pointer-events: none;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border: 1px solid #333;
-        }
-        #npc-dialog {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(20, 0, 0, 0.8);
-            color: #ffaa00;
-            padding: 15px;
-            border: 2px solid #550000;
-            display: none;
-            text-align: center;
-            width: 60%;
-        }
-        #drone-panel {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0, 20, 40, 0.8);
-            padding: 10px;
-            border: 1px solid #0055ff;
-            cursor: pointer;
-            pointer-events: auto;
-        }
-        canvas {
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
-        }
+        body { margin: 0; background: #050505; color: #00ff00; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        canvas { border: 2px solid #222; box-shadow: 0 0 30px rgba(0,255,0,0.1); }
+        #info { margin-top: 10px; font-size: 14px; text-align: center; }
     </style>
 </head>
 <body>
 
-    <div id="ui-layer">
-        <h3>Агент 01</h3>
-        <div>Здоровье: <span id="hp">100</span>%</div>
-        <div>Оружие: <span id="weapon">Мачете</span></div>
-        <div>Разведданные: <span id="intel">0</span>/10</div>
-        <div>Слизни: <span id="slugs">0</span></div>
-    </div>
-
-    <div id="drone-panel" onclick="callDrone()">
-        🚁 Вызвать Дрона<br>
-        <small>(Отправить данные)</small>
-    </div>
-
-    <div id="npc-dialog"></div>
-
     <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="info">Нажми <b>ПРОБЕЛ</b>, чтобы перегенерировать мир заново. <br>Зеленый — База, Серый — дороги/пустыри, Коричневый — стены заброшек.</div>
 
 <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-    // Состояние игры
-    const game = {
-        width: 2000,
-        height: 2000,
-        camera: { x: 0, y: 0 }
-    };
+// Размеры сетки мира
+const GRID_SIZE = 60; // Карта 60х60 тайлов
+const TILE_SIZE = 32; // Каждый тайл 32х32 пикселя
 
-    // База
-    const base = { x: 800, y: 800, width: 400, height: 400 };
+// Типы тайлов
+const TILE = {
+    EMPTY: 0,   // Пустырь / земля
+    WALL: 1,    // Стена заброшки
+    BASE: 2,    // Территория базы
+    ROAD: 3     // Дорога / улочка
+};
 
-    // Игрок
-    const player = {
-        x: 1000,
-        y: 1000,
-        size: 20,
-        speed: 4,
-        hp: 100,
-        slugs: 0,
-        intel: 0,
-        dx: 0,
-        dy: 0
-    };
+let worldMap = [];
 
-    // NPC (Полуобморок)
-    const npc = { x: 950, y: 950, size: 25 };
-    const npcPhrases = [
-        "Раньше меня тоже вела дорога приключений... а потом зомби откусил мне половину колена. Слизни есть?",
-        "О, свежее мясо. Ой, то есть... привет, командир.",
-        "Не трогай этот мох в заброшках, с него пучит. Давай лучше слизней.",
-        "Дрон прилетел? Закажи мне новенькую печень, моя что-то барахлит.",
-        "Там на севере толпа утырков. Но я видел, как они сожрали курьера с электроникой."
-    ];
-
-    // Массивы объектов
-    const zombies = [];
-    const loot = [];
-
-    // Генерация мира
-    for (let i = 0; i < 50; i++) {
-        zombies.push({
-            x: Math.random() * game.width,
-            y: Math.random() * game.height,
-            size: 20,
-            speed: 1 + Math.random()
-        });
-    }
-
-    for (let i = 0; i < 30; i++) {
-        loot.push({
-            x: Math.random() * game.width,
-            y: Math.random() * game.height,
-            type: Math.random() > 0.5 ? 'slug' : 'intel',
-            size: 10
-        });
-    }
-
-    // Управление
-    const keys = {};
-    window.addEventListener('keydown', e => keys[e.code] = true);
-    window.addEventListener('keyup', e => keys[e.code] = false);
-
-    function callDrone() {
-        if (player.intel > 0) {
-            alert(`Дрон забрал ${player.intel} пакетов разведданных и доставил пайки!`);
-            player.intel = 0;
-            updateUI();
-        } else {
-            alert("Нет ценных данных для отправки.");
+// 1. Алгоритм процедурной генерации
+function generateWorld() {
+    worldMap = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(TILE.EMPTY));
+    
+    // Создаем безопасную базу строго в центре (размер 10х10 тайлов)
+    const baseStart = Math.floor(GRID_SIZE / 2) - 5;
+    for (let x = baseStart; x < baseStart + 10; x++) {
+        for (let y = baseStart; y < baseStart + 10; y++) {
+            worldMap[x][y] = TILE.BASE;
         }
     }
 
-    function showNpcDialog() {
-        const dialog = document.getElementById('npc-dialog');
-        const phrase = npcPhrases[Math.floor(Math.random() * npcPhrases.length)];
-        
-        let text = phrase;
-        if (player.slugs > 0) {
-            text += `<br><i>*Полуобморок забирает ${player.slugs} слизней и довольно чавкает*</i>`;
-            player.slugs = 0;
-            updateUI();
-        }
+    // Генерируем заброшенные дома (случайные комнаты за пределами базы)
+    const roomCount = 15 + Math.floor(Math.random() * 10); // 15-25 домов
+    for (let i = 0; i < roomCount; i++) {
+        let roomW = 4 + Math.floor(Math.random() * 6); // ширина 4-10
+        let roomH = 4 + Math.floor(Math.random() * 6); // высота 4-10
+        let roomX = Math.floor(Math.random() * (GRID_SIZE - roomW - 2)) + 1;
+        let roomY = Math.floor(Math.random() * (GRID_SIZE - roomH - 2)) + 1;
 
-        dialog.innerHTML = text;
-        dialog.style.display = 'block';
-        setTimeout(() => dialog.style.display = 'none', 5000);
-    }
-
-    function updateUI() {
-        document.getElementById('hp').innerText = player.hp;
-        document.getElementById('intel').innerText = player.intel;
-        document.getElementById('slugs').innerText = player.slugs;
-    }
-
-    function update() {
-        // Движение игрока
-        if (keys['KeyW'] && player.y > 0) player.y -= player.speed;
-        if (keys['KeyS'] && player.y < game.height) player.y += player.speed;
-        if (keys['KeyA'] && player.x > 0) player.x -= player.speed;
-        if (keys['KeyD'] && player.x < game.width) player.x += player.speed;
-
-        // Взаимодействие с NPC
-        if (keys['KeyE']) {
-            const dist = Math.hypot(player.x - npc.x, player.y - npc.y);
-            if (dist < 50) showNpcDialog();
-        }
-
-        // Обновление камеры (следит за игроком)
-        game.camera.x = player.x - canvas.width / 2;
-        game.camera.y = player.y - canvas.height / 2;
-
-        // Логика зомби
-        zombies.forEach(z => {
-            // Если зомби не на базе, он идет к игроку
-            if (z.x < base.x || z.x > base.x + base.width || z.y < base.y || z.y > base.y + base.height) {
-                const angle = Math.atan2(player.y - z.y, player.x - z.x);
-                z.x += Math.cos(angle) * z.speed;
-                z.y += Math.sin(angle) * z.speed;
-            }
-        });
-
-        // Сбор лута
-        for (let i = loot.length - 1; i >= 0; i--) {
-            const l = loot[i];
-            if (Math.hypot(player.x - l.x, player.y - l.y) < player.size + l.size) {
-                if (l.type === 'slug') player.slugs++;
-                if (l.type === 'intel') player.intel++;
-                loot.splice(i, 1);
-                updateUI();
+        // Проверяем, чтобы дом не залез на базу
+        let overlapsBase = false;
+        for (let x = roomX - 1; x < roomX + roomW + 1; x++) {
+            for (let y = roomY - 1; y < roomY + roomH + 1; y++) {
+                if (worldMap[x] && worldMap[x][y] === TILE.BASE) overlapsBase = true;
             }
         }
+
+        // Если место свободно, строим коробку дома (стены по периметру, пустота внутри)
+        if (!overlapsBase) {
+            for (let x = roomX; x < roomX + roomW; x++) {
+                for (let y = roomY; y < roomY + roomH; y++) {
+                    if (x === roomX || x === roomX + roomW - 1 || y === roomY || y === roomY + roomH - 1) {
+                        worldMap[x][y] = TILE.WALL; // Стены
+                    }
+                }
+            }
+            
+            // Пробиваем случайную дверь в стене
+            let doorX = roomX + Math.floor(Math.random() * (roomW - 2)) + 1;
+            worldMap[doorX][roomY] = TILE.EMPTY; 
+        }
     }
 
-    function draw() {
-        // Очистка экрана
-        ctx.fillStyle = '#222';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.save();
-        ctx.translate(-game.camera.x, -game.camera.y);
-
-        // Рисуем базу
-        ctx.fillStyle = '#334';
-        ctx.fillRect(base.x, base.y, base.width, base.height);
-        
-        // Линии базы
-        ctx.strokeStyle = '#556';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(base.x, base.y, base.width, base.height);
-
-        // Рисуем NPC
-        ctx.fillStyle = '#8b8000';
-        ctx.beginPath();
-        ctx.arc(npc.x, npc.y, npc.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#000';
-        ctx.fillText("E", npc.x - 4, npc.y + 4);
-
-        // Рисуем лут
-        loot.forEach(l => {
-            ctx.fillStyle = l.type === 'slug' ? '#0f0' : '#00f';
-            ctx.beginPath();
-            ctx.arc(l.x, l.y, l.size, 0, Math.PI * 2);
-            ctx.fill();
-        });
-
-        // Рисуем зомби
-        zombies.forEach(z => {
-            ctx.fillStyle = '#f00';
-            ctx.beginPath();
-            ctx.arc(z.x, z.y, z.size, 0, Math.PI * 2);
-            ctx.fill();
-        });
-
-        // Рисуем игрока
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
-
-        // Туман войны
-        drawFogOfWar();
+    // Прокладываем пару случайных улочек-линий
+    for (let k = 0; k < 4; k++) {
+        let startX = Math.floor(Math.random() * GRID_SIZE);
+        for (let y = 0; y < GRID_SIZE; y++) {
+            if (worldMap[startX][y] === TILE.EMPTY) worldMap[startX][y] = TILE.ROAD;
+        }
     }
+}
 
-    function drawFogOfWar() {
-        const radius = 250; // Радиус видимости
-        const x = canvas.width / 2;
-        const y = canvas.height / 2;
+// 2. Отрисовка карты (Камера зафиксирована по центру для демонстрации)
+function drawWorld() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Центрируем сетку на экране
+    const offsetX = (canvas.width - GRID_SIZE * TILE_SIZE) / 2;
+    const offsetY = (canvas.height - GRID_SIZE * TILE_SIZE) / 2;
 
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-in';
-        const gradient = ctx.createRadialGradient(x, y, radius * 0.5, x, y, radius);
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.restore();
+    for (let x = 0; x < GRID_SIZE; x++) {
+        for (let y = 0; y < GRID_SIZE; y++) {
+            let tile = worldMap[x][y];
+            
+            if (tile === TILE.BASE) ctx.fillStyle = '#1b4d22'; // База
+            else if (tile === TILE.WALL) ctx.fillStyle = '#5c4033'; // Стены заброшек
+            else if (tile === TILE.ROAD) ctx.fillStyle = '#333333'; // Улочки
+            else ctx.fillStyle = '#111111'; // Пустыри
 
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-over';
-        ctx.fillStyle = '#000'; // Цвет скрытой области
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.restore();
+            ctx.fillRect(offsetX + x * TILE_SIZE, offsetY + y * TILE_SIZE, TILE_SIZE - 1, TILE_SIZE - 1);
+        }
     }
+}
 
-    function loop() {
-        update();
-        draw();
-        requestAnimationFrame(loop);
+// Запуск и управление
+generateWorld();
+drawWorld();
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+        generateWorld();
+        drawWorld();
     }
-
-    // Запуск
-    loop();
+});
 </script>
 </body>
 </html>
