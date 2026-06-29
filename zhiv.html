@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Постапокалипсис: Агент</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #111; /* Мрачный темный фон */
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 4px solid #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Настройки нашего Агента
+    const player = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        size: 20,
+        speed: 4,
+        color: '#00ffcc' // Светится как продвинутый военный костюм
+    };
+
+    // Отслеживаем нажатые клавиши
+    const keys = {};
+
+    window.addEventListener('keydown', (e) => {
+        keys[e.code] = true;
+    });
+
+    window.addEventListener('keyup', (e) => {
+        keys[e.code] = false;
+    });
+
+    // Главный игровой цикл
+    function gameLoop() {
+        update(); // 1. Обсчитываем движения
+        render(); // 2. Рисуем всё на экране
+
+        requestAnimationFrame(gameLoop); // Запускаем цикл снова и снова
+    }
+
+    // Логика обновления данных
+    function update() {
+        // Движение (W, A, S, D или стрелочки)
+        if (keys['KeyW'] || keys['ArrowUp']) player.y -= player.speed;
+        if (keys['KeyS'] || keys['ArrowDown']) player.y += player.speed;
+        if (keys['KeyA'] || keys['ArrowLeft']) player.x -= player.speed;
+        if (keys['KeyD'] || keys['ArrowRight']) player.x += player.speed;
+
+        // Ограничение, чтобы Агент не убежал за границы экрана
+        if (player.x < player.size) player.x = player.size;
+        if (player.x > canvas.width - player.size) player.x = canvas.width - player.size;
+        if (player.y < player.size) player.y = player.size;
+        if (player.y > canvas.height - player.size) player.y = canvas.height - player.size;
+    }
+
+    // Логика отрисовки
+    function render() {
+        // Очищаем экран мрачным цветом выжженной земли
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Рисуем сетку (прообраз будущей карты/плиток)
+        ctx.strokeStyle = '#2a2a2a';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < canvas.width; x += 40) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+        }
+        for (let y = 0; y < canvas.height; y += 40) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+        }
+
+        // Рисуем нашего Агента (пока в виде круга)
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+        ctx.fillStyle = player.color;
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    // Запуск игры!
+    gameLoop();
+</script>
+</body>
+</html>
