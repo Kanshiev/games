@@ -2,25 +2,73 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Постапокалипсис: Агент на задании</title>
+    <title>Wasteland Agent</title>
     <style>
         body {
             margin: 0;
+            padding: 0;
             background-color: #111;
-            overflow: hidden;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            font-family: 'Courier New', Courier, monospace; /* Военный стиль шрифта */
+            overflow: hidden;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border: 1px solid #333;
+        }
+        #npc-dialog {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 0, 0, 0.8);
+            color: #ffaa00;
+            padding: 15px;
+            border: 2px solid #550000;
+            display: none;
+            text-align: center;
+            width: 60%;
+        }
+        #drone-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 20, 40, 0.8);
+            padding: 10px;
+            border: 1px solid #0055ff;
+            cursor: pointer;
+            pointer-events: auto;
         }
         canvas {
-            border: 4px solid #444;
-            box-shadow: 0 0 30px rgba(0,0,0,0.9);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
         }
     </style>
 </head>
 <body>
+
+    <div id="ui-layer">
+        <h3>Агент 01</h3>
+        <div>Здоровье: <span id="hp">100</span>%</div>
+        <div>Оружие: <span id="weapon">Мачете</span></div>
+        <div>Разведданные: <span id="intel">0</span>/10</div>
+        <div>Слизни: <span id="slugs">0</span></div>
+    </div>
+
+    <div id="drone-panel" onclick="callDrone()">
+        🚁 Вызвать Дрона<br>
+        <small>(Отправить данные)</small>
+    </div>
+
+    <div id="npc-dialog"></div>
 
     <canvas id="gameCanvas" width="800" height="600"></canvas>
 
@@ -28,111 +76,220 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    // Размеры ОГРОМНОГО мира (в пикселях)
-    const world = {
-        width: 3000,
-        height: 3000
+    // Состояние игры
+    const game = {
+        width: 2000,
+        height: 2000,
+        camera: { x: 0, y: 0 }
     };
 
-    // Настройки Агента (теперь он спавнится в самом центре мира)
+    // База
+    const base = { x: 800, y: 800, width: 400, height: 400 };
+
+    // Игрок
     const player = {
-        x: world.width / 2,
-        y: world.height / 2,
-        size: 18,
-        speed: 5,
-        color: '#00ffcc'
+        x: 1000,
+        y: 1000,
+        size: 20,
+        speed: 4,
+        hp: 100,
+        slugs: 0,
+        intel: 0,
+        dx: 0,
+        dy: 0
     };
 
-    // Настройки Камеры (следит за игроком)
-    const camera = {
-        x: 0,
-        y: 0
-    };
+    // NPC (Полуобморок)
+    const npc = { x: 950, y: 950, size: 25 };
+    const npcPhrases = [
+        "Раньше меня тоже вела дорога приключений... а потом зомби откусил мне половину колена. Слизни есть?",
+        "О, свежее мясо. Ой, то есть... привет, командир.",
+        "Не трогай этот мох в заброшках, с него пучит. Давай лучше слизней.",
+        "Дрон прилетел? Закажи мне новенькую печень, моя что-то барахлит.",
+        "Там на севере толпа утырков. Но я видел, как они сожрали курьера с электроникой."
+    ];
 
-    // Военная база (прямо по центру мира)
-    const base = {
-        x: world.width / 2 - 250,
-        y: world.height / 2 - 250,
-        width: 500,
-        height: 500
-    };
+    // Массивы объектов
+    const zombies = [];
+    const loot = [];
 
-    // Наш NPC Полуобморок
-    const npc = {
-        x: world.width / 2 + 100, // Стоит чуть правее центра базы
-        y: world.height / 2 + 50,
-        size: 16,
-        color: '#889955', // Такой... полугнилой зеленоватый цвет
-        phrase: "Если тебя сожрут, можно мне твои берцы? Мои пальцы уже отваливаются...",
-        showText: false
-    };
+    // Генерация мира
+    for (let i = 0; i < 50; i++) {
+        zombies.push({
+            x: Math.random() * game.width,
+            y: Math.random() * game.height,
+            size: 20,
+            speed: 1 + Math.random()
+        });
+    }
 
+    for (let i = 0; i < 30; i++) {
+        loot.push({
+            x: Math.random() * game.width,
+            y: Math.random() * game.height,
+            type: Math.random() > 0.5 ? 'slug' : 'intel',
+            size: 10
+        });
+    }
+
+    // Управление
     const keys = {};
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    window.addEventListener('keyup', e => keys[e.code] = false);
 
-    window.addEventListener('keydown', (e) => keys[e.code] = true);
-    window.addEventListener('keyup', (e) => keys[e.code] = false);
+    function callDrone() {
+        if (player.intel > 0) {
+            alert(`Дрон забрал ${player.intel} пакетов разведданных и доставил пайки!`);
+            player.intel = 0;
+            updateUI();
+        } else {
+            alert("Нет ценных данных для отправки.");
+        }
+    }
 
-    function gameLoop() {
-        update();
-        render();
-        requestAnimationFrame(gameLoop);
+    function showNpcDialog() {
+        const dialog = document.getElementById('npc-dialog');
+        const phrase = npcPhrases[Math.floor(Math.random() * npcPhrases.length)];
+        
+        let text = phrase;
+        if (player.slugs > 0) {
+            text += `<br><i>*Полуобморок забирает ${player.slugs} слизней и довольно чавкает*</i>`;
+            player.slugs = 0;
+            updateUI();
+        }
+
+        dialog.innerHTML = text;
+        dialog.style.display = 'block';
+        setTimeout(() => dialog.style.display = 'none', 5000);
+    }
+
+    function updateUI() {
+        document.getElementById('hp').innerText = player.hp;
+        document.getElementById('intel').innerText = player.intel;
+        document.getElementById('slugs').innerText = player.slugs;
     }
 
     function update() {
         // Движение игрока
-        if (keys['KeyW'] || keys['ArrowUp']) player.y -= player.speed;
-        if (keys['KeyS'] || keys['ArrowDown']) player.y += player.speed;
-        if (keys['KeyA'] || keys['ArrowLeft']) player.x -= player.speed;
-        if (keys['KeyD'] || keys['ArrowRight']) player.x += player.speed;
+        if (keys['KeyW'] && player.y > 0) player.y -= player.speed;
+        if (keys['KeyS'] && player.y < game.height) player.y += player.speed;
+        if (keys['KeyA'] && player.x > 0) player.x -= player.speed;
+        if (keys['KeyD'] && player.x < game.width) player.x += player.speed;
 
-        // Ограничиваем Агента границами ВСЕГО МИРА (а не экрана)
-        if (player.x < player.size) player.x = player.size;
-        if (player.x > world.width - player.size) player.x = world.width - player.size;
-        if (player.y < player.size) player.y = player.size;
-        if (player.y > world.height - player.size) player.y = world.height - player.size;
+        // Взаимодействие с NPC
+        if (keys['KeyE']) {
+            const dist = Math.hypot(player.x - npc.x, player.y - npc.y);
+            if (dist < 50) showNpcDialog();
+        }
 
-        // ЦЕНТРИРУЕМ КАМЕРУ НА ИГРОКЕ
-        camera.x = player.x - canvas.width / 2;
-        camera.y = player.y - canvas.height / 2;
+        // Обновление камеры (следит за игроком)
+        game.camera.x = player.x - canvas.width / 2;
+        game.camera.y = player.y - canvas.height / 2;
 
-        // Не даем камере выходить за края карты
-        if (camera.x < 0) camera.x = 0;
-        if (camera.y < 0) camera.y = 0;
-        if (camera.x > world.width - canvas.width) camera.x = world.width - canvas.width;
-        if (camera.y > world.height - canvas.height) camera.y = world.height - canvas.height;
+        // Логика зомби
+        zombies.forEach(z => {
+            // Если зомби не на базе, он идет к игроку
+            if (z.x < base.x || z.x > base.x + base.width || z.y < base.y || z.y > base.y + base.height) {
+                const angle = Math.atan2(player.y - z.y, player.x - z.x);
+                z.x += Math.cos(angle) * z.speed;
+                z.y += Math.sin(angle) * z.speed;
+            }
+        });
 
-        // ПРОВЕРКА: Близко ли игрок к Полуобмороку?
-        let dx = player.x - npc.x;
-        let dy = player.y - npc.y;
-        let distance = Math.sqrt(dx * dx + dy * dy);
-
-        // Если подошли ближе чем на 100 пикселей — он заговаривает
-        if (distance < 100) {
-            npc.showText = true;
-        } else {
-            npc.showText = false;
+        // Сбор лута
+        for (let i = loot.length - 1; i >= 0; i--) {
+            const l = loot[i];
+            if (Math.hypot(player.x - l.x, player.y - l.y) < player.size + l.size) {
+                if (l.type === 'slug') player.slugs++;
+                if (l.type === 'intel') player.intel++;
+                loot.splice(i, 1);
+                updateUI();
+            }
         }
     }
 
-    function render() {
-        // Заливаем фон (чернота за пределами карты)
-        ctx.fillStyle = '#050505';
+    function draw() {
+        // Очистка экрана
+        ctx.fillStyle = '#222';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Сдвигаем холст под координаты камеры
         ctx.save();
-        ctx.translate(-camera.x, -camera.y);
+        ctx.translate(-game.camera.x, -game.camera.y);
 
-        // --- ВСЁ, ЧТО РИСУЕТСЯ НИЖЕ, СУЩЕСТВУЕТ В КООРДИНАТАХ БОЛЬШОГО МИРА ---
+        // Рисуем базу
+        ctx.fillStyle = '#334';
+        ctx.fillRect(base.x, base.y, base.width, base.height);
+        
+        // Линии базы
+        ctx.strokeStyle = '#556';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(base.x, base.y, base.width, base.height);
 
-        // Выжженная земля (карта 3000х3000)
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(0, 0, world.width, world.height);
+        // Рисуем NPC
+        ctx.fillStyle = '#8b8000';
+        ctx.beginPath();
+        ctx.arc(npc.x, npc.y, npc.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.fillText("E", npc.x - 4, npc.y + 4);
 
-        // Сетка мира (шаг 100 пикселей)
-        ctx.strokeStyle = '#252525';
-        ctx.lineWidth = 1;
-        for (let x = 0; x <= world.width; x += 100) {
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, world.height); ctx.stroke();
-        }
-        for (let y = 0; y <= world.height; y += 100)Normally I can help with things like this, but I don't seem to have access to that content. You can try again or ask me for something else.
+        // Рисуем лут
+        loot.forEach(l => {
+            ctx.fillStyle = l.type === 'slug' ? '#0f0' : '#00f';
+            ctx.beginPath();
+            ctx.arc(l.x, l.y, l.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Рисуем зомби
+        zombies.forEach(z => {
+            ctx.fillStyle = '#f00';
+            ctx.beginPath();
+            ctx.arc(z.x, z.y, z.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Рисуем игрока
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        // Туман войны
+        drawFogOfWar();
+    }
+
+    function drawFogOfWar() {
+        const radius = 250; // Радиус видимости
+        const x = canvas.width / 2;
+        const y = canvas.height / 2;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-in';
+        const gradient = ctx.createRadialGradient(x, y, radius * 0.5, x, y, radius);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = '#000'; // Цвет скрытой области
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+    }
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    // Запуск
+    loop();
+</script>
+</body>
+</html>
