@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Wasteland Agent: Missions & Quests</title>
+    <title>Wasteland Agent: Survival & Quests</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         body { 
@@ -24,6 +24,7 @@
         .val-cyan { font-weight: bold; color: #00ffff; }
         .val-grey { font-weight: bold; color: #c0c0c0; }
         .val-purple { font-weight: bold; color: #a020f0; }
+        .val-red { font-weight: bold; color: #ff5555; }
 
         button {
             background: #111; border: 1px solid #333; color: #0f0; padding: 5px; 
@@ -34,6 +35,8 @@
         
         .btn-evac { background: #400; border-color: #f00; color: #f00; font-weight: bold; padding: 10px; display: none; }
         .btn-evac:hover { background: #f00; color: #fff; }
+        .btn-quest { background: #316; border-color: #a020f0; color: #e0a0ff; }
+        .btn-quest:hover { background: #528; color: #fff; }
 
         #log-messages { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
         #log-messages::-webkit-scrollbar { width: 5px; }
@@ -45,9 +48,9 @@
 
 <div id="ui-panel" class="side-panel">
     <div class="ui-section">
-        <h3>АГЕНТ</h3>
+        <h3>АГЕНТ (Уровень <span id="ui-level" class="val-cyan">1</span>)</h3>
         <div class="stat-row"><span>❤️ Здоровье:</span> <span id="ui-lives" class="val">3 / 3</span></div>
-        <div class="stat-row"><span>🛡️ Броня:</span> <span id="ui-armor" class="val-grey">0 / 5</span></div>
+        <div class="stat-row"><span>💀 Убито нечисти:</span> <span id="ui-kills" class="val-red">0</span></div>
         <button onclick="window.gameScene.buyMedkit()">Купить Аптечку (10 монет)</button>
     </div>
     
@@ -57,11 +60,17 @@
     </div>
 
     <div class="ui-section">
-        <h3>ИНВЕНТАРЬ</h3>
+        <h3>ИНВЕНТАРЬ (<span id="ui-inv-count" class="val">0</span>/25)</h3>
         <div class="stat-row"><span>Слизней:</span> <span id="ui-slugs" class="val">0</span></div>
-        <div class="stat-row"><span>Монеток:</span> <span id="ui-coins" class="val-gold">0</span></div>
+        <div class="stat-row"><span>🛡️ Броня:</span> <span id="ui-armor" class="val-grey">0</span></div>
         <div class="stat-row"><span>Микросхем:</span> <span id="ui-chips" class="val-cyan">0</span></div>
-        <div class="stat-row"><span>Рука Упыря:</span> <span id="ui-hand" class="val-purple">Нет</span></div>
+        <div class="stat-row" style="color:#aaa; font-size: 11px;">(Вне лимита) Монеток: <span id="ui-coins" class="val-gold">0</span></div>
+    </div>
+
+    <div class="ui-section" id="quest-section">
+        <h3>КВЕСТ УПЫРЯ</h3>
+        <div class="stat-row"><span>Статус:</span> <span id="ui-quest-status" class="val-purple">Не начат</span></div>
+        <button id="btn-accept-quest" class="btn-quest" style="display:none;" onclick="window.gameScene.acceptQuest()">Принять квест</button>
     </div>
 
     <div class="ui-section">
@@ -82,30 +91,36 @@
     class GameScene extends Phaser.Scene {
         constructor() { super('GameScene'); }
 
-        // Метод init получает данные из предыдущей сцены (для сохранения лута при переходе)
         init(data) {
             if (data && data.playerStats) {
                 this.playerStats = data.playerStats;
             } else {
                 this.playerStats = {
+                    level: 1, kills: 0,
                     lives: 3, armor: 0, slugs: 0, intel: 0, coins: 0, chips: 0,
                     hasWeapon: false, ammo: 0, npcSlugs: 0,
-                    hasHand: false, questHandDelivered: false
+                    questState: 0, // 0 - не начат, 1 - предложен, 2 - принят (рука заспавнена), 3 - выполнен
+                    hasHand: false
                 };
             }
+            this.MAX_INVENTORY = 25;
+        }
+
+        getInventoryCount() {
+            return this.playerStats.slugs + this.playerStats.intel + this.playerStats.armor + this.playerStats.chips + (this.playerStats.hasHand ? 1 : 0);
         }
 
         create() {
-            window.gameScene = this; // Экспорт для HTML-кнопок
+            window.gameScene = this;
 
             const GRID_SIZE = 60, TILE_SIZE = 32;
             const worldWidth = GRID_SIZE * TILE_SIZE, worldHeight = GRID_SIZE * TILE_SIZE;
-
             this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
             
             this.isInvulnerable = false;
             this.lastNpcTalkTime = 0;
             this.lastDroneAction = 0;
+            this.lastInvFullMsgTime = 0;
 
             this.npcJokes = [
                 "Пули — это хорошо. Но слизни надежнее. Они хотя бы не рикошетят.",
@@ -183,7 +198,7 @@
                         for (let y = roomY; y < roomY + roomH; y++) {
                             if (x === roomX || x === roomX + roomW - 1 || y === roomY || y === roomY + roomH - 1) {
                                 wallsList.push({x, y});
-                            } else { this.mapGrid[x][y] = 3; } // Пол внутри
+                            } else { this.mapGrid[x][y] = 3; }
                         }
                     }
 
@@ -223,17 +238,17 @@
             this.chipsGroup = this.physics.add.group();
             this.armorGroup = this.physics.add.group();
             this.bulletsGroup = this.physics.add.group();
-            this.questGroup = this.physics.add.group(); // Группа для квестовой руки
+            this.questGroup = this.physics.add.group();
 
-            // Спавн обычных слизней
+            // Спавн с учетом Уровня (+15% врагов каждый уровень)
+            let wandererCount = Math.floor(20 * Math.pow(1.15, this.playerStats.level - 1));
+
             this.spawnObjectsOnGrid(this.slugsGroup, 25, 0x00ff00, 6);
-            
-            // Спавн Флешек с охраной и обычных бродячих зомби
             this.spawnIntelAndGuards(10);
-            this.spawnWanderingZombies(20);
+            this.spawnWanderingZombies(wandererCount);
 
-            // Спавн Квестовой Руки (если квест еще не сдан и руки нет в инвентаре)
-            if (!this.playerStats.questHandDelivered && !this.playerStats.hasHand) {
+            // Если квест уже был принят ранее, но рука не доставлена, спавним её.
+            if (this.playerStats.questState === 2 && !this.playerStats.hasHand) {
                 this.spawnQuestHand();
             }
 
@@ -242,11 +257,11 @@
             this.physics.add.collider(this.zombiesGroup, this.baseBarrier);
             this.physics.add.collider(this.bulletsGroup, this.walls, (bullet) => bullet.destroy());
 
-            this.physics.add.overlap(this.player, this.slugsGroup, (p, i) => this.collectItem(i, 'slugs'), null, this);
-            this.physics.add.overlap(this.player, this.intelGroup, (p, i) => this.collectItem(i, 'intel'), null, this);
-            this.physics.add.overlap(this.player, this.coinsGroup, (p, i) => this.collectItem(i, 'coins'), null, this);
-            this.physics.add.overlap(this.player, this.chipsGroup, (p, i) => this.collectItem(i, 'chips'), null, this);
-            this.physics.add.overlap(this.player, this.armorGroup, this.collectArmor, null, this);
+            this.physics.add.overlap(this.player, this.slugsGroup, (p, i) => this.collectItem(i, 'slugs', true), null, this);
+            this.physics.add.overlap(this.player, this.intelGroup, (p, i) => this.collectItem(i, 'intel', true), null, this);
+            this.physics.add.overlap(this.player, this.coinsGroup, (p, i) => this.collectItem(i, 'coins', false), null, this);
+            this.physics.add.overlap(this.player, this.chipsGroup, (p, i) => this.collectItem(i, 'chips', true), null, this);
+            this.physics.add.overlap(this.player, this.armorGroup, (p, i) => this.collectItem(i, 'armor', true), null, this);
             this.physics.add.overlap(this.player, this.questGroup, this.collectHand, null, this);
 
             this.physics.add.overlap(this.player, this.npc, this.interactNPC, null, this);
@@ -254,7 +269,6 @@
             this.physics.add.overlap(this.player, this.zombiesGroup, this.hitPlayer, null, this);
             this.physics.add.overlap(this.bulletsGroup, this.zombiesGroup, this.shootZombie, null, this);
 
-            // Стрельба
             this.input.on('pointerdown', (pointer) => {
                 if (this.playerStats.hasWeapon) {
                     if (this.playerStats.ammo > 0) {
@@ -276,7 +290,7 @@
             this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
             this.cameras.main.setZoom(1.2);
 
-            this.addLogMessage('Система', 'Высадка прошла успешно. Выполняйте задачу.', '#aaa');
+            this.addLogMessage('Система', `Уровень ${this.playerStats.level}. Высадка прошла успешно.`, '#aaa');
             if (this.playerStats.hasWeapon) document.getElementById('weapon-section').style.display = 'block';
             this.updateUI();
 
@@ -306,7 +320,12 @@
             }
         }
 
-        // Спавн флешек с прикрепленными охранниками
+        // Здоровье зомби скалируется (+10% каждый уровень)
+        getZombieHp() {
+            let baseHp = Phaser.Math.Between(2, 4);
+            return Math.floor(baseHp * Math.pow(1.10, this.playerStats.level - 1));
+        }
+
         spawnIntelAndGuards(count) {
             let spawned = 0, attempts = 0;
             while (spawned < count && attempts < 1500) {
@@ -319,22 +338,20 @@
                     let intel = this.add.circle(intelX, intelY, 6, 0x0000ff);
                     this.intelGroup.add(intel);
                     
-                    // Спавним 2-3 охранников вокруг этой флешки
                     let guardCount = Phaser.Math.Between(2, 3);
                     for(let i=0; i<guardCount; i++) {
-                        // Позиция спавна охранника (немного сдвинута от флешки)
                         let ox = intelX + Phaser.Math.Between(-20, 20);
                         let oy = intelY + Phaser.Math.Between(-20, 20);
                         let guard = this.add.circle(ox, oy, 10, 0xff0000);
                         this.physics.add.existing(guard);
                         guard.body.setCollideWorldBounds(true);
                         guard.body.setBounce(1);
-                        guard.hp = Phaser.Math.Between(2, 4);
+                        guard.hp = this.getZombieHp();
                         
-                        // Специальные свойства для патрулирования
                         guard.isGuard = true;
                         guard.guardX = intelX;
                         guard.guardY = intelY;
+                        guard.isChasing = false;
                         this.zombiesGroup.add(guard);
                     }
                     spawned++;
@@ -342,7 +359,6 @@
             }
         }
 
-        // Спавн обычных бродячих зомби
         spawnWanderingZombies(count) {
             let spawned = 0, attempts = 0;
             while (spawned < count && attempts < 1500) {
@@ -353,97 +369,97 @@
                     this.physics.add.existing(zombie);
                     zombie.body.setCollideWorldBounds(true);
                     zombie.body.setBounce(1);
-                    zombie.hp = Phaser.Math.Between(2, 4);
+                    zombie.hp = this.getZombieHp();
                     zombie.isGuard = false;
+                    zombie.isChasing = false;
                     this.zombiesGroup.add(zombie);
                     spawned++;
                 }
             }
         }
 
-        // Спавн детализированной квестовой руки внутри одной из комнат
         spawnQuestHand() {
             let spawned = false, attempts = 0;
             while (!spawned && attempts < 1500) {
                 attempts++;
-                let tx = Phaser.Math.Between(1, this.mapGrid.length - 2);
-                let ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
-                
-                // Ищем только пол внутри комнат (3)
+                let tx = Phaser.Math.Between(1, this.mapGrid.length - 2), ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
                 if (this.mapGrid[tx][ty] === 3) {
                     let handX = tx * 32 + 16;
                     let handY = ty * 32 + 16;
                     
-                    // Создаем контейнер, чтобы объединить все части руки в один физический объект
                     let handContainer = this.add.container(handX, handY);
                     this.physics.add.existing(handContainer);
                     handContainer.body.setSize(20, 20);
                     
-                    // 1. Лужица крови под рукой (темно-красный приплюснутый круг)
                     let blood = this.add.ellipse(0, 4, 22, 12, 0x8b0000);
-                    
-                    // 2. Ладонь (основной фиолетово-бледный круг)
                     let palm = this.add.circle(0, 0, 7, 0xa020f0);
-                    
-                    // 3. Пальцы (маленькие вытянутые эллипсы или кружки, торчащие вверх)
-                    let finger1 = this.add.circle(-5, -4, 2, 0xb030ff); // Большой
-                    let finger2 = this.add.circle(-2, -7, 2, 0xb030ff); // Указательный
-                    let finger3 = this.add.circle(1, -8, 2.2, 0xb030ff); // Средний
-                    let finger4 = this.add.circle(4, -6, 2, 0xb030ff); // Безымянный
-                    let finger5 = this.add.circle(6, -3, 1.8, 0xb030ff); // Мизинец
-                    
-                    // 4. Обрубок запястья (светло-костлявая точка в основании)
+                    let finger1 = this.add.circle(-5, -4, 2, 0xb030ff); 
+                    let finger2 = this.add.circle(-2, -7, 2, 0xb030ff); 
+                    let finger3 = this.add.circle(1, -8, 2.2, 0xb030ff); 
+                    let finger4 = this.add.circle(4, -6, 2, 0xb030ff); 
+                    let finger5 = this.add.circle(6, -3, 1.8, 0xb030ff); 
                     let bone = this.add.rectangle(0, 6, 4, 3, 0xeeeeee);
 
-                    // Сгружаем всё в контейнер
                     handContainer.add([blood, palm, finger1, finger2, finger3, finger4, finger5, bone]);
-                    
-                    // Добавляем контейнер в квестовую группу, чтобы Агент мог его подобрать
                     this.questGroup.add(handContainer);
                     
-                    // Мягкое мерцание, чтобы предмет выделялся в темноте заброшки
-                    this.tweens.add({
-                        targets: handContainer,
-                        alpha: 0.6,
-                        duration: 800,
-                        yoyo: true,
-                        repeat: -1
-                    });
-
+                    this.tweens.add({ targets: handContainer, alpha: 0.6, duration: 800, yoyo: true, repeat: -1 });
                     spawned = true;
                 }
             }
         }
 
-        collectItem(item, type) {
+        collectItem(item, type, takesSlot) {
+            if (takesSlot && this.getInventoryCount() >= this.MAX_INVENTORY) {
+                if (this.time.now > this.lastInvFullMsgTime + 2000) {
+                    this.addLogMessage('СИСТЕМА', 'Инвентарь полон (25/25)!', '#ff0000');
+                    this.lastInvFullMsgTime = this.time.now;
+                }
+                return;
+            }
             item.destroy();
             this.playerStats[type]++;
             this.updateUI();
         }
 
-        collectArmor(player, armorItem) {
-            if (this.playerStats.armor < 5) {
-                armorItem.destroy();
-                this.playerStats.armor++;
-                this.updateUI();
-            }
-        }
-
         collectHand(player, hand) {
+            if (this.getInventoryCount() >= this.MAX_INVENTORY) {
+                if (this.time.now > this.lastInvFullMsgTime + 2000) {
+                    this.addLogMessage('СИСТЕМА', 'Инвентарь полон! Освободите место для Руки.', '#ff0000');
+                    this.lastInvFullMsgTime = this.time.now;
+                }
+                return;
+            }
             hand.destroy();
             this.playerStats.hasHand = true;
-            this.addLogMessage('Система', 'Найдена оторванная рука. Кажется, она принадлежит Упырю.', '#a020f0');
+            this.addLogMessage('СИСТЕМА', 'Найдена оторванная рука. Кажется, она принадлежит Упырю.', '#a020f0');
+            this.updateUI();
+        }
+
+        acceptQuest() {
+            this.playerStats.questState = 2; // Принят
+            document.getElementById('btn-accept-quest').style.display = 'none';
+            this.addLogMessage('Упырь', 'Отлично! Ищи в заброшках. Вернешь — озолочу.', '#ffaa00');
+            this.spawnQuestHand();
             this.updateUI();
         }
 
         interactNPC() {
-            // Если принесли руку
+            // Инициализация квеста
+            if (this.playerStats.questState === 0) {
+                this.addLogMessage('Упырь', 'Агент, тут такое дело... Я руку левую посеял. Поможешь найти?', '#ffaa00');
+                this.playerStats.questState = 1; // Предложен
+                document.getElementById('btn-accept-quest').style.display = 'block';
+                this.updateUI();
+                return;
+            }
+
+            // Сдача квеста
             if (this.playerStats.hasHand) {
                 this.playerStats.hasHand = false;
-                this.playerStats.questHandDelivered = true;
+                this.playerStats.questState = 3; // Выполнен
                 this.addLogMessage('Упырь', 'МОЯ РУКА! Я думал, её сожрали! Держи царский подгон из заначки!', '#a020f0');
                 
-                // Раскидываем 15 единиц случайного мощного лута
                 for(let i=0; i<15; i++) {
                     let rand = Phaser.Math.Between(1, 100);
                     if (rand <= 40) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5); 
@@ -452,12 +468,12 @@
                 }
                 this.updateUI();
                 this.lastNpcTalkTime = this.time.now;
-                return; // Выходим, чтобы не смешивать с обычным обменом
+                return;
             }
 
-            // Обычный обмен слизней
+            // Обычный обмен слизней (1 слизень = 2 предмета)
             if (this.playerStats.slugs > 0) {
-                let amountToSpawn = this.playerStats.slugs * 3;
+                let amountToSpawn = this.playerStats.slugs * 2;
                 for(let i=0; i<amountToSpawn; i++) {
                     let rand = Phaser.Math.Between(1, 100);
                     if (rand <= 50) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5);
@@ -523,12 +539,12 @@
             if (zombie.hp <= 0) {
                 let zx = zombie.x; let zy = zombie.y;
                 zombie.destroy();
+                this.playerStats.kills++;
+                this.updateUI();
                 
-                // Дроп с убитого: 100% слизень, 30% монетка
                 let slug = this.add.circle(zx, zy, 6, 0x00ff00);
                 this.slugsGroup.add(slug);
                 if (Phaser.Math.Between(1, 100) <= 30) {
-                    // Монетка немного отлетает в сторону
                     let coin = this.add.circle(zx + Phaser.Math.Between(-10, 10), zy + Phaser.Math.Between(-10, 10), 5, 0xffd700);
                     this.coinsGroup.add(coin);
                 }
@@ -568,35 +584,45 @@
         finishMission() {
             if (this.playerStats.intel >= 10) {
                 this.playerStats.intel -= 10;
-                this.addLogMessage('ШТАБ', 'Данные приняты. Опергруппа выслана. Подготовка переброски на новую карту...', '#00ff00');
+                this.playerStats.level++;
+                this.addLogMessage('ШТАБ', `Данные приняты. Переход на Уровень ${this.playerStats.level}...`, '#00ff00');
                 
-                // Перезапуск сцены с передачей текущего инвентаря
                 this.time.delayedCall(2000, () => {
-                    document.getElementById('log-messages').innerHTML = ''; // Очистка лога
+                    document.getElementById('log-messages').innerHTML = ''; 
                     this.scene.restart({ playerStats: this.playerStats });
                 });
             }
         }
 
         updateUI() {
+            document.getElementById('ui-level').innerText = this.playerStats.level;
+            document.getElementById('ui-kills').innerText = this.playerStats.kills;
             document.getElementById('ui-lives').innerText = `${this.playerStats.lives} / 3`;
-            document.getElementById('ui-armor').innerText = `${this.playerStats.armor} / 5`;
+            document.getElementById('ui-inv-count').innerText = this.getInventoryCount();
+            
+            document.getElementById('ui-armor').innerText = this.playerStats.armor;
             document.getElementById('ui-slugs').innerText = this.playerStats.slugs;
             document.getElementById('ui-coins').innerText = this.playerStats.coins;
             document.getElementById('ui-chips').innerText = this.playerStats.chips;
             document.getElementById('ui-intel').innerText = `${this.playerStats.intel} / 10`;
             document.getElementById('ui-ammo').innerText = this.playerStats.ammo;
             
-            document.getElementById('ui-hand').innerText = this.playerStats.questHandDelivered ? "Отдана" : (this.playerStats.hasHand ? "Найдена" : "Нет");
-            document.getElementById('ui-hand').style.color = (this.playerStats.hasHand || this.playerStats.questHandDelivered) ? "#00ff00" : "#a020f0";
-
-            // Кнопка завершения миссии
-            let btnFinish = document.getElementById('btn-finish');
-            if (this.playerStats.intel >= 10) {
-                btnFinish.style.display = 'block';
+            // Логика отображения Квеста
+            let questSec = document.getElementById('quest-section');
+            let qStatus = document.getElementById('ui-quest-status');
+            
+            if (this.playerStats.level > 1 && this.playerStats.questState === 3) {
+                questSec.style.display = 'none'; // Скрываем после 1 уровня, если выполнен
             } else {
-                btnFinish.style.display = 'none';
+                questSec.style.display = 'block';
+                if (this.playerStats.questState === 0) qStatus.innerText = "Не начат";
+                else if (this.playerStats.questState === 1) qStatus.innerText = "Ждет ответа";
+                else if (this.playerStats.questState === 2) qStatus.innerText = (this.playerStats.hasHand ? "Найдена" : "В процессе");
+                else if (this.playerStats.questState === 3) qStatus.innerText = "Выполнен";
             }
+
+            let btnFinish = document.getElementById('btn-finish');
+            btnFinish.style.display = (this.playerStats.intel >= 10) ? 'block' : 'none';
         }
 
         update() {
@@ -609,33 +635,42 @@
             if (this.cursors.up.isDown || this.wasd.W.isDown) this.player.body.setVelocityY(-playerSpeed);
             else if (this.cursors.down.isDown || this.wasd.S.isDown) this.player.body.setVelocityY(playerSpeed);
 
-            // Шутки Упыря
             let distToNpc = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y);
-            if (!this.playerStats.hasHand && distToNpc < 120 && this.time.now > this.lastNpcTalkTime + 12000) {
-                let joke = Phaser.Utils.Array.GetRandom(this.npcJokes);
-                if (!this.playerStats.questHandDelivered && Phaser.Math.Between(1, 3) === 1) {
-                    joke = "Ты не видел мою левую руку? Кажется, тот утырок унес ее в сторону заброшек.";
+            if (distToNpc < 120 && this.time.now > this.lastNpcTalkTime + 12000) {
+                if (this.playerStats.questState === 0) {
+                    this.interactNPC(); // Авто-вызов диалога квеста
+                } else {
+                    let joke = Phaser.Utils.Array.GetRandom(this.npcJokes);
+                    this.addLogMessage('Упырь', joke, '#ffaa00');
+                    this.lastNpcTalkTime = this.time.now;
                 }
-                this.addLogMessage('Упырь', joke, '#ffaa00');
-                this.lastNpcTalkTime = this.time.now;
             }
 
-            // Умная логика Зомби (Патруль и Брождение)
+            // Умная логика Зомби с Агрессией
             const zombieSpeed = 40; 
+            const aggroSpeed = 70;
+            
             this.zombiesGroup.children.iterate(zombie => {
-                if (zombie.isGuard) {
-                    // Логика охранника
+                let distToPlayer = Phaser.Math.Distance.Between(zombie.x, zombie.y, this.player.x, this.player.y);
+                
+                // Проверка Агрессии
+                if (distToPlayer < 150) zombie.isChasing = true;
+                else if (distToPlayer > 250) zombie.isChasing = false;
+
+                if (zombie.isChasing) {
+                    // Преследование игрока
+                    this.physics.moveToObject(zombie, this.player, aggroSpeed);
+                } else if (zombie.isGuard) {
+                    // Патруль
                     let distToGuardPoint = Phaser.Math.Distance.Between(zombie.x, zombie.y, zombie.guardX, zombie.guardY);
                     if (distToGuardPoint > 80) {
-                        // Если отошел слишком далеко от своей флешки - возвращается
                         this.physics.moveTo(zombie, zombie.guardX, zombie.guardY, zombieSpeed);
                     } else if (Math.abs(zombie.body.velocity.x) < 5 && Math.abs(zombie.body.velocity.y) < 5 || Phaser.Math.Between(0, 80) === 0) {
-                        // Хаотично бродит вокруг флешки
                         let angle = Phaser.Math.Between(0, 360);
                         this.physics.velocityFromAngle(angle, zombieSpeed, zombie.body.velocity);
                     }
                 } else {
-                    // Логика обычного бродяги
+                    // Обычное брождение
                     if (Math.abs(zombie.body.velocity.x) < 5 && Math.abs(zombie.body.velocity.y) < 5) {
                         let angle = Phaser.Math.Between(0, 360);
                         this.physics.velocityFromAngle(angle, zombieSpeed, zombie.body.velocity);
