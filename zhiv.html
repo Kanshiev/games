@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Wasteland Agent: Smart Magnet & Tactics</title>
+    <title>Wasteland Agent: Balanced Build</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         body { 
@@ -154,7 +154,7 @@
             this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
             
             this.isInvulnerable = false;
-            this.isSuperMagnetActive = false; // Для чит-кода
+            this.isSuperMagnetActive = false; 
             this.lastNpcTalkTime = 0;
             this.lastDroneAction = 0;
             this.lastInvFullMsgTime = 0;
@@ -279,22 +279,21 @@
             this.tweens.add({ targets: npcBody, scaleY: 1.1, scaleX: 1.05, duration: 1500, yoyo: true, repeat: -1 });
             this.tweens.add({ targets: [npcHead, npcEye1, npcEye2], x: '+=2', duration: 100, yoyo: true, repeat: -1, repeatDelay: 3000 });
 
-            // === ВИЗУАЛ АГЕНТА В СЕРЫХ ТОНАХ ===
+            // Агент в серых тонах
             this.player = this.add.container(baseXPx + baseSizePx/2, baseYPx + baseSizePx/2);
             this.physics.add.existing(this.player);
-            this.player.body.setSize(24, 24); // Хитбокс
+            this.player.body.setSize(24, 24); 
             this.player.body.setCollideWorldBounds(true);
             this.physics.add.collider(this.player, this.walls);
 
-            // Отрисовка бойца вид сверху (смотрит вправо по умолчанию, угол 0)
-            let pBackpack = this.add.rectangle(-8, 0, 10, 18, 0x333333); // Темный рюкзак сзади
-            let pShoulders = this.add.ellipse(0, 0, 20, 28, 0x555555); // Серые плечи
-            let pHead = this.add.circle(4, 0, 9, 0x888888); // Светло-серая каска
-            let pVisor = this.add.rectangle(11, 0, 6, 12, 0x111111); // Черный тактический визор спереди
+            let pBackpack = this.add.rectangle(-8, 0, 10, 18, 0x333333);
+            let pShoulders = this.add.ellipse(0, 0, 20, 28, 0x555555); 
+            let pHead = this.add.circle(4, 0, 9, 0x888888); 
+            let pVisor = this.add.rectangle(11, 0, 6, 12, 0x111111);
             
             this.player.add([pBackpack, pShoulders, pHead, pVisor]);
 
-            // Группы Лута и Врагов
+            // Группы
             this.slugsGroup = this.physics.add.group();
             this.intelGroup = this.physics.add.group();
             this.zombiesGroup = this.physics.add.group();
@@ -308,7 +307,7 @@
             let wandererCount = Math.floor(20 * Math.pow(1.15, this.playerStats.level - 1));
 
             this.spawnObjectsOnGrid(this.slugsGroup, 25, 0x00ff00, 6);
-            this.spawnObjectsOnGrid(this.heartsGroup, 3, 0xff0055, 8); // Снижено кол-во стартовых аптечек до 3
+            this.spawnObjectsOnGrid(this.heartsGroup, 3, 0xff0055, 8); 
             this.spawnIntelAndGuards(10);
             this.spawnWanderingZombies(wandererCount);
 
@@ -316,7 +315,6 @@
                 this.spawnQuestHand();
             }
 
-            // Коллизии
             this.physics.add.collider(this.zombiesGroup, this.walls);
             this.physics.add.collider(this.zombiesGroup, this.baseBarrier);
             this.physics.add.collider(this.bulletsGroup, this.walls, (bullet) => bullet.destroy());
@@ -334,7 +332,6 @@
             this.physics.add.overlap(this.player, this.zombiesGroup, this.hitPlayer, null, this);
             this.physics.add.overlap(this.bulletsGroup, this.zombiesGroup, this.shootZombie, null, this);
 
-            // Обработка Чит-кода через клавиатуру
             this.input.keyboard.on('keydown', (event) => {
                 if (event.key.length === 1 && event.key.match(/[a-zA-Zа-яА-Я]/i)) {
                     this.cheatBuffer += event.key.toLowerCase();
@@ -346,8 +343,8 @@
                         this.playerStats.armor = 5;
                         
                         this.isSuperMagnetActive = true;
-                        this.player.body.checkCollision.none = true; // Сквозь стены
-                        this.player.setAlpha(0.6); // Призрак
+                        this.player.body.checkCollision.none = true; 
+                        this.player.setAlpha(0.6); 
                         
                         this.addLogMessage('ЧИТ', 'ВКЛЮЧЕН РЕЖИМ БОГА! (+Деньги, Броня, Сквозь стены, Супермагнит на 10 сек)', '#ff00ff');
                         this.updateUI();
@@ -369,7 +366,6 @@
                         this.playerStats.ammo--;
                         this.updateUI();
                         
-                        // Вычисляем угол и смещаем спавн пули к стволу (визору)
                         let angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
                         let bulletX = this.player.x + Math.cos(angle) * 16;
                         let bulletY = this.player.y + Math.sin(angle) * 16;
@@ -431,7 +427,11 @@
             while (spawned < count && attempts < 1500) {
                 attempts++;
                 let tx = Phaser.Math.Between(1, this.mapGrid.length - 2), ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
+                
+                // Проверяем, что клетка свободна, и занимаем её, чтобы не было наложений
                 if (this.mapGrid[tx][ty] === 0 || this.mapGrid[tx][ty] === 3) {
+                    this.mapGrid[tx][ty] = 4; // Метка занятости флешкой
+                    
                     let intelX = tx * 32 + 16, intelY = ty * 32 + 16;
                     let intel = this.add.circle(intelX, intelY, 6, 0x0000ff);
                     this.intelGroup.add(intel);
@@ -497,9 +497,7 @@
         }
 
         collectItem(item, type, takesSlot) {
-            if (takesSlot && this.getInventoryCount() >= this.playerStats.maxInventory) {
-                return; // Игнорируем подбор
-            }
+            if (takesSlot && this.getInventoryCount() >= this.playerStats.maxInventory) return;
             item.destroy();
             this.playerStats[type]++;
             this.updateUI();
@@ -507,7 +505,7 @@
 
         collectCoin(coin) {
             coin.destroy();
-            this.playerStats.coins += Phaser.Math.Between(1, 3);
+            this.playerStats.coins += 1;
             this.updateUI();
         }
 
@@ -521,22 +519,14 @@
         }
 
         collectArmor(player, armorItem) {
-            if (this.playerStats.armor >= 5 || this.getInventoryCount() >= this.playerStats.maxInventory) {
-                return; // Игнорируем
-            }
+            if (this.playerStats.armor >= 5 || this.getInventoryCount() >= this.playerStats.maxInventory) return;
             armorItem.destroy();
             this.playerStats.armor++;
             this.updateUI();
         }
 
         collectHand(player, hand) {
-            if (this.getInventoryCount() >= this.playerStats.maxInventory) {
-                if (this.time.now > this.lastInvFullMsgTime + 2000) {
-                    this.addLogMessage('СИСТЕМА', 'Освободите место для Руки.', '#ff0000');
-                    this.lastInvFullMsgTime = this.time.now;
-                }
-                return;
-            }
+            if (this.getInventoryCount() >= this.playerStats.maxInventory) return;
             hand.destroy();
             this.playerStats.hasHand = true;
             this.addLogMessage('СИСТЕМА', 'Найдена оторванная рука.', '#a020f0');
@@ -566,26 +556,32 @@
                 
                 for(let i=0; i<15; i++) {
                     let rand = Phaser.Math.Between(1, 100);
-                    if (rand <= 60) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5); 
+                    if (rand <= 40) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5); 
                     else if (rand <= 90) this.spawnObjectsOnGrid(this.chipsGroup, 1, 0x00ffff, 6); 
-                    else this.spawnObjectsOnGrid(this.armorGroup, 1, 0xc0c0c0, 6); 
+                    else if (rand <= 95) this.spawnObjectsOnGrid(this.armorGroup, 1, 0xc0c0c0, 6); 
+                    else this.spawnObjectsOnGrid(this.heartsGroup, 1, 0xff0055, 8);
                 }
                 this.updateUI();
                 this.lastNpcTalkTime = this.time.now;
                 return;
             }
 
-            if (this.playerStats.slugs > 0) {
-                let amountToSpawn = this.playerStats.slugs * 2;
+            let slugsToTrade = this.playerStats.slugs;
+            if (slugsToTrade > 0) {
+                let amountToSpawn = 0;
+                // С одного слизня от 2 до 3 единиц лута
+                for(let i=0; i<slugsToTrade; i++) amountToSpawn += Phaser.Math.Between(2, 3);
+                
                 for(let i=0; i<amountToSpawn; i++) {
                     let rand = Phaser.Math.Between(1, 100);
-                    // Баланс: 60% монеты, 25% чипы, 15% броня
-                    if (rand <= 60) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5);
-                    else if (rand <= 85) this.spawnObjectsOnGrid(this.chipsGroup, 1, 0x00ffff, 6);
-                    else this.spawnObjectsOnGrid(this.armorGroup, 1, 0xc0c0c0, 6);
+                    // 40% монеты, 50% микросхемы, 5% броня, 5% сердечки
+                    if (rand <= 40) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5);
+                    else if (rand <= 90) this.spawnObjectsOnGrid(this.chipsGroup, 1, 0x00ffff, 6);
+                    else if (rand <= 95) this.spawnObjectsOnGrid(this.armorGroup, 1, 0xc0c0c0, 6);
+                    else this.spawnObjectsOnGrid(this.heartsGroup, 1, 0xff0055, 8);
                 }
                 this.addLogMessage('Упырь', `Держи ништяки, Агент! Раскидал по округе.`, '#ffaa00');
-                this.playerStats.npcSlugs += this.playerStats.slugs;
+                this.playerStats.npcSlugs += slugsToTrade;
                 this.playerStats.slugs = 0;
                 this.updateUI();
                 this.lastNpcTalkTime = this.time.now;
@@ -736,11 +732,16 @@
                 let slug = this.add.circle(zx, zy, 6, 0x00ff00);
                 this.slugsGroup.add(slug);
                 
-                if (Phaser.Math.Between(1, 100) <= 60) {
-                    let coin = this.add.circle(zx + Phaser.Math.Between(-10, 10), zy + Phaser.Math.Between(-10, 10), 5, 0xffd700);
-                    this.coinsGroup.add(coin);
+                // 50% шанс на монеты, роняет 1-2 физические монетки
+                if (Phaser.Math.Between(1, 100) <= 50) {
+                    let numCoins = Phaser.Math.Between(1, 2);
+                    for(let i=0; i<numCoins; i++) {
+                        let coin = this.add.circle(zx + Phaser.Math.Between(-10, 10), zy + Phaser.Math.Between(-10, 10), 5, 0xffd700);
+                        this.coinsGroup.add(coin);
+                    }
                 }
                 
+                // 5% аптечки и броня
                 if (Phaser.Math.Between(1, 100) <= 5) {
                     let heart = this.add.circle(zx + Phaser.Math.Between(-15, 15), zy + Phaser.Math.Between(-15, 15), 8, 0xff0055);
                     this.heartsGroup.add(heart);
@@ -815,7 +816,6 @@
             
             document.getElementById('ui-chest-chips').innerText = this.playerStats.chestChips;
 
-            // Логика кнопки Магнита
             let btnMagnet = document.getElementById('btn-magnet');
             let magLvlLabel = document.getElementById('ui-magnet-lvl');
             if (this.playerStats.magnetLevel < 5) {
@@ -827,7 +827,6 @@
                 btnMagnet.style.display = 'none';
             }
 
-            // Логика квеста в интерфейсе
             let questSec = document.getElementById('quest-section');
             if (questSec) {
                 let qStatus = document.getElementById('ui-quest-status');
@@ -867,44 +866,38 @@
             if (this.cursors.up.isDown || this.wasd.W.isDown) this.player.body.setVelocityY(-playerSpeed);
             else if (this.cursors.down.isDown || this.wasd.S.isDown) this.player.body.setVelocityY(playerSpeed);
 
-            // Поворот Агента за курсором
             let pointer = this.input.activePointer;
             this.player.rotation = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
 
-            // Логика УМНОГО МАГНИТА
-            if (this.playerStats.magnetLevel > 0 || this.isSuperMagnetActive) {
-                let magnetRadius = this.isSuperMagnetActive ? 600 : (30 + (this.playerStats.magnetLevel * 40));
-                
-                let invFull = this.getInventoryCount() >= this.playerStats.maxInventory;
-                let hpFull = this.playerStats.lives >= 3;
-                let armorFull = this.playerStats.armor >= 5;
+            // УМНЫЙ МАГНИТ (Базовый радиус 35 для комфортного сбора)
+            let magnetRadius = this.isSuperMagnetActive ? 600 : (35 + (this.playerStats.magnetLevel * 40));
+            let invFull = this.getInventoryCount() >= this.playerStats.maxInventory;
+            let hpFull = this.playerStats.lives >= 3;
+            let armorFull = this.playerStats.armor >= 5;
 
-                const pullItem = (group, condition) => {
-                    group.children.iterate(item => {
-                        if (item && item.body) {
-                            let dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, item.x, item.y);
-                            if (dist < magnetRadius && (condition || this.isSuperMagnetActive)) {
-                                this.physics.moveToObject(item, this.player, this.isSuperMagnetActive ? 500 : 250);
-                            } else {
-                                item.body.setVelocity(0, 0); // Падает на землю, если условия не выполнены
-                            }
+            const pullItem = (group, condition) => {
+                group.children.iterate(item => {
+                    if (item && item.body) {
+                        let dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, item.x, item.y);
+                        if (dist < magnetRadius && (condition || this.isSuperMagnetActive)) {
+                            this.physics.moveToObject(item, this.player, this.isSuperMagnetActive ? 500 : 250);
+                        } else {
+                            item.body.setVelocity(0, 0); 
                         }
-                    });
-                };
+                    }
+                });
+            };
 
-                // Тащим с условиями
-                pullItem(this.slugsGroup, !invFull);
-                pullItem(this.chipsGroup, !invFull);
-                pullItem(this.armorGroup, !invFull && !armorFull);
-                pullItem(this.heartsGroup, !hpFull);
-                pullItem(this.coinsGroup, true); // Деньги тащим всегда
-                
-                // Флешки тащим ТОЛЬКО если активен чит
-                if (this.isSuperMagnetActive) {
-                    pullItem(this.intelGroup, true);
-                } else {
-                    this.intelGroup.children.iterate(item => { if(item && item.body) item.body.setVelocity(0,0); });
-                }
+            pullItem(this.slugsGroup, !invFull);
+            pullItem(this.chipsGroup, !invFull);
+            pullItem(this.armorGroup, !invFull && !armorFull);
+            pullItem(this.heartsGroup, !hpFull);
+            pullItem(this.coinsGroup, true); 
+            
+            if (this.isSuperMagnetActive) {
+                pullItem(this.intelGroup, true);
+            } else {
+                this.intelGroup.children.iterate(item => { if(item && item.body) item.body.setVelocity(0,0); });
             }
 
             let distToChest = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.chest.x, this.chest.y);
