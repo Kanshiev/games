@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Wasteland Agent: Balanced Build</title>
+    <title>Wasteland Agent: Bosses & Acid</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         body { 
@@ -119,12 +119,22 @@
 
         init(data) {
             this.RANKS = [
-                { name: "Рядовой", reqKills: 0, invLimit: 25, cost: 0 },
-                { name: "Ефрейтор", reqKills: 50, invLimit: 35, cost: 50 },
-                { name: "Сержант", reqKills: 120, invLimit: 50, cost: 120 },
-                { name: "Прапорщик", reqKills: 250, invLimit: 65, cost: 300 },
-                { name: "Лейтенант", reqKills: 450, invLimit: 80, cost: 500 },
-                { name: "Капитан Пустоши", reqKills: 700, invLimit: 100, cost: 800 }
+                { name: "Рядовой", reqKills: 0 },
+                { name: "Ефрейтор", reqKills: 50 },
+                { name: "Сержант", reqKills: 120 },
+                { name: "Прапорщик", reqKills: 250 },
+                { name: "Лейтенант", reqKills: 450 },
+                { name: "Капитан Пустоши", reqKills: 700 }
+            ];
+
+            // Поэтапные улучшения рюкзака
+            this.BACKPACKS = [
+                { limit: 25, cost: 0, reqRank: 0 },
+                { limit: 35, cost: 50, reqRank: 1 },
+                { limit: 50, cost: 120, reqRank: 2 },
+                { limit: 65, cost: 300, reqRank: 3 },
+                { limit: 80, cost: 500, reqRank: 4 },
+                { limit: 100, cost: 800, reqRank: 5 }
             ];
 
             this.MAGNET_COSTS = [200, 450, 800, 1300, 2000];
@@ -133,11 +143,11 @@
                 this.playerStats = data.playerStats;
             } else {
                 this.playerStats = {
-                    level: 1, kills: 0, rankIndex: 0, maxInventory: 25, magnetLevel: 0,
+                    level: 1, kills: 0, rankIndex: 0, 
+                    bagLevel: 0, maxInventory: 25, magnetLevel: 0,
                     lives: 3, armor: 0, slugs: 0, intel: 0, coins: 0, chips: 0,
                     hasWeapon: false, ammo: 0, npcSlugs: 0,
-                    chestChips: 0,
-                    questState: 0, hasHand: false
+                    chestChips: 0, questState: 0, hasHand: false
                 };
             }
         }
@@ -158,41 +168,23 @@
             this.lastNpcTalkTime = 0;
             this.lastDroneAction = 0;
             this.lastInvFullMsgTime = 0;
+            this.lastPlayerAcidTime = 0;
             this.isNearChest = false;
+            this.bossSpawned = false;
             this.cheatBuffer = '';
 
             this.npcJokes = [
-                "Пули — это хорошо. Но слизни надежнее. Они хотя бы не рикошетят.",
+                "Пули — это хорошо. Но слизни надежнее.",
                 "Стреляй им по коленям! А, стоп, это из другой игры.",
                 "Не трать патроны на меня, я уже наполовину мертв.",
                 "Главное правило Пустоши: если оно шевелится — стреляй. Если светится — беги.",
-                "О, монетки собираешь? Зря, ими даже костер нормально не разожжешь.",
-                "Раньше меня тоже вела дорога приключений, а потом... кислотный дождь прожег мне колено.",
-                "Помню, строил автоматизацию умного дома. Теперь тут только умная плесень.",
-                "Знаешь, в чем плюс конца света? Больше не нужно платить за коммуналку!",
-                "Я бы предложил тебе чаю, но последняя заварка мутировала и сожрала мою кружку.",
-                "Эти слизни на вкус как жженая резина. Неси еще, я подсел.",
                 "Отличная погодка сегодня. Всего минус два радтаракана на квадратный метр.",
-                "Улыбнись, Агент. Хуже уже не будет. Ну, до прилета десанта зачистки.",
-                "Вчера пытался вспомнить вкус пиццы... В итоге вспомнил только вкус крысиного хвоста. М-да.",
-                "Если зомби откусит тебе ногу — не переживай. У меня есть отличный рецепт супа из голени!",
-                "Знаешь, почему утырки всегда ходят толпой? Одиночество в этом мире слишком... убойное.",
-                "Дрон сегодня так шумел винтами, что я чуть не отдал концы раньше времени. Принес хоть патроны?",
-                "Там в заброшках кондиционеры до сих пор работают. Жаль, внутри только замороженные трупы.",
-                "Мой левый глаз теперь видит в инфракрасном спектре. Правда, только когда я засыпаю.",
-                "Не наступай на те зеленые лужи. Мой знакомый наступил — теперь мы зовем его 'Фонарик'.",
-                "Агент, если штаб решит нас разбомбить, пообещай, что спрячешь меня в сундук. Там уютно.",
-                "Слышал вой на севере? Это местный хор зомби. Репетируют перед твоим приходом.",
-                "Иногда мне кажется, что вся эта нечисть просто хочет обнимашек. Очень крепких и зубастых.",
-                "Эй, командир, закажи у Дрона туалетную бумагу. Газеты довоенных времен слишком... жестко критикуют.",
-                "Если найдешь в домах консервы тридцатилетней давности — тащи мне. Мой желудок переварит даже свинец.",
-                "Знаешь, какая разница между мной и зомби? Я шучу смешнее, а пахнем мы примерно одинаково.",
-                "В штабе обещали эвакуацию? Ага, держи карман шире. Вертолеты нынче стоят дороже, чем мы оба.",
-                "Утырки на удивление чистоплотные. Вон, кости предыдущего агента обглодали до блеска!"
+                "Эти слизни на вкус как жженая резина. Неси еще, я подсел."
             ];
 
             this.mapGrid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
             this.walls = this.physics.add.staticGroup();
+            this.acidGroup = this.physics.add.staticGroup();
             
             let bgGraphics = this.add.graphics();
             bgGraphics.fillStyle(0x111111, 1);
@@ -215,6 +207,7 @@
             this.baseBarrier = this.add.zone(baseXPx + baseSizePx/2, baseYPx + baseSizePx/2, baseSizePx, baseSizePx);
             this.physics.add.existing(this.baseBarrier, true);
 
+            // Генерация Заброшек
             let roomsBuilt = 0, attempts = 0;
             while (roomsBuilt < 25 && attempts < 300) {
                 attempts++;
@@ -252,6 +245,29 @@
                 }
             }
 
+            // Кислотные кляксы (5 штук)
+            let spawnedAcid = 0;
+            while(spawnedAcid < 5) {
+                let tx = Phaser.Math.Between(1, this.mapGrid.length - 2), ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
+                if (this.mapGrid[tx][ty] === 0 || this.mapGrid[tx][ty] === 3) {
+                    let ax = tx * 32 + 16, ay = ty * 32 + 16;
+                    let puddle = this.add.container(ax, ay);
+                    let p1 = this.add.ellipse(0, 0, 45, 35, 0x33cc33, 0.6);
+                    let p2 = this.add.ellipse(-12, -8, 25, 20, 0x44ee44, 0.5);
+                    let p3 = this.add.ellipse(12, 10, 30, 20, 0x22aa22, 0.7);
+                    puddle.add([p1, p2, p3]);
+
+                    this.physics.add.existing(puddle, true);
+                    puddle.body.setCircle(20, -20, -15); 
+                    this.acidGroup.add(puddle);
+                    
+                    // Легкая анимация кипения
+                    this.tweens.add({ targets: p1, scaleX: 1.05, scaleY: 1.05, duration: 1000, yoyo: true, repeat: -1 });
+                    spawnedAcid++;
+                }
+            }
+
+            // База
             this.dronePad = this.add.rectangle(baseXPx + 50, baseYPx + baseSizePx/2, 40, 40, 0x555555);
             this.physics.add.existing(this.dronePad, true);
             this.add.text(this.dronePad.x - 16, this.dronePad.y - 6, 'H', { fontSize: '18px', fill: '#00ffff', fontStyle: 'bold' });
@@ -268,18 +284,16 @@
             this.npc = this.add.container(baseXPx + baseSizePx - 50, baseYPx + baseSizePx/2);
             this.physics.add.existing(this.npc, true);
             this.npc.body.setSize(30, 30);
-            
             let npcBody = this.add.ellipse(0, 5, 24, 28, 0x4a5a4a); 
             let npcHead = this.add.circle(0, -10, 10, 0x5a6a5a); 
             let npcEye1 = this.add.circle(-4, -12, 2, 0xffaa00); 
             let npcEye2 = this.add.circle(4, -12, 2, 0xffaa00);
             this.npc.add([npcBody, npcHead, npcEye1, npcEye2]);
             this.add.text(this.npc.x - 15, this.npc.y - 30, 'Упырь', { fontSize: '11px', fill: '#ffaa00' });
-
             this.tweens.add({ targets: npcBody, scaleY: 1.1, scaleX: 1.05, duration: 1500, yoyo: true, repeat: -1 });
             this.tweens.add({ targets: [npcHead, npcEye1, npcEye2], x: '+=2', duration: 100, yoyo: true, repeat: -1, repeatDelay: 3000 });
 
-            // Агент в серых тонах
+            // Агент
             this.player = this.add.container(baseXPx + baseSizePx/2, baseYPx + baseSizePx/2);
             this.physics.add.existing(this.player);
             this.player.body.setSize(24, 24); 
@@ -290,7 +304,6 @@
             let pShoulders = this.add.ellipse(0, 0, 20, 28, 0x555555); 
             let pHead = this.add.circle(4, 0, 9, 0x888888); 
             let pVisor = this.add.rectangle(11, 0, 6, 12, 0x111111);
-            
             this.player.add([pBackpack, pShoulders, pHead, pVisor]);
 
             // Группы
@@ -306,8 +319,8 @@
 
             let wandererCount = Math.floor(20 * Math.pow(1.15, this.playerStats.level - 1));
 
-            this.spawnObjectsOnGrid(this.slugsGroup, 25, 0x00ff00, 6);
-            this.spawnObjectsOnGrid(this.heartsGroup, 3, 0xff0055, 8); 
+            this.spawnObjectsOnGrid(this.slugsGroup, 25, 0x00ff00, 6, 'slug');
+            this.spawnObjectsOnGrid(this.heartsGroup, 3, 0xff0055, 8, 'heart'); 
             this.spawnIntelAndGuards(10);
             this.spawnWanderingZombies(wandererCount);
 
@@ -315,10 +328,36 @@
                 this.spawnQuestHand();
             }
 
+            // Коллизии
             this.physics.add.collider(this.zombiesGroup, this.walls);
             this.physics.add.collider(this.zombiesGroup, this.baseBarrier);
             this.physics.add.collider(this.bulletsGroup, this.walls, (bullet) => bullet.destroy());
 
+            // Кислота действует как стена для зомби, ТОЛЬКО если они не гонятся за игроком
+            this.physics.add.collider(this.zombiesGroup, this.acidGroup, null, (zombie, acid) => {
+                return !zombie.isChasing; 
+            });
+
+            // Урон от кислоты
+            this.physics.add.overlap(this.player, this.acidGroup, () => {
+                if (this.time.now > this.lastPlayerAcidTime + 1000 && !this.isInvulnerable) {
+                    this.hitPlayer(this.player, null);
+                    this.lastPlayerAcidTime = this.time.now;
+                    this.addLogMessage('ОПАСНОСТЬ', 'Кислотный ожог!', '#44ff44');
+                }
+            });
+
+            this.physics.add.overlap(this.zombiesGroup, this.acidGroup, (zombie, acid) => {
+                if (!zombie.lastAcidTime || this.time.now > zombie.lastAcidTime + 1000) {
+                    zombie.hp -= 2;
+                    zombie.lastAcidTime = this.time.now;
+                    zombie.each(c => { if(c.setFillStyle) c.setFillStyle(0x44ff44); });
+                    this.time.delayedCall(200, () => zombie.each(c => { if(c.setFillStyle) c.setFillStyle(c.originalColor); }));
+                    if (zombie.hp <= 0) this.killZombie(zombie);
+                }
+            });
+
+            // Сбор предметов
             this.physics.add.overlap(this.player, this.slugsGroup, (p, i) => this.collectItem(i, 'slugs', true), null, this);
             this.physics.add.overlap(this.player, this.intelGroup, (p, i) => this.collectItem(i, 'intel', false), null, this); 
             this.physics.add.overlap(this.player, this.coinsGroup, (p, i) => this.collectCoin(i), null, this);
@@ -332,6 +371,7 @@
             this.physics.add.overlap(this.player, this.zombiesGroup, this.hitPlayer, null, this);
             this.physics.add.overlap(this.bulletsGroup, this.zombiesGroup, this.shootZombie, null, this);
 
+            // Чит-код
             this.input.keyboard.on('keydown', (event) => {
                 if (event.key.length === 1 && event.key.match(/[a-zA-Zа-яА-Я]/i)) {
                     this.cheatBuffer += event.key.toLowerCase();
@@ -404,17 +444,62 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
-        spawnObjectsOnGrid(group, count, color, size) {
+        // Обновленный спавн с поддержкой прорисованных фишек (микросхем)
+        spawnObjectsOnGrid(group, count, color, size, type = 'basic') {
             let spawned = 0, attempts = 0;
             while (spawned < count && attempts < 1500) {
                 attempts++;
                 let tx = Phaser.Math.Between(1, this.mapGrid.length - 2), ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
                 if (this.mapGrid[tx][ty] === 0 || this.mapGrid[tx][ty] === 3) {
-                    let obj = this.add.circle(tx * 32 + 16, ty * 32 + 16, size, color);
+                    let lx = tx * 32 + 16, ly = ty * 32 + 16;
+                    let obj;
+                    if (type === 'chip') {
+                        obj = this.createChipVisual(lx, ly);
+                    } else {
+                        obj = this.add.circle(lx, ly, size, color);
+                    }
                     group.add(obj);
                     spawned++;
                 }
             }
+        }
+
+        createChipVisual(x, y) {
+            let chip = this.add.container(x, y);
+            let base = this.add.rectangle(0, 0, 12, 12, 0x004400);
+            let c1 = this.add.rectangle(-3, -3, 3, 3, 0x00ffff);
+            let c2 = this.add.rectangle(3, 3, 3, 3, 0x00ffff);
+            chip.add([base, c1, c2]);
+            this.physics.add.existing(chip);
+            chip.body.setSize(12, 12);
+            return chip;
+        }
+
+        // Прорисованный зомби-контейнер
+        createZombieVisual(x, y, hp, isGuard, gx, gy) {
+            let zombie = this.add.container(x, y);
+            let zBody = this.add.ellipse(0, 0, 20, 20, 0x2d4c1e);
+            let zHead = this.add.circle(5, 0, 8, 0x3a5c23); 
+            let zArmL = this.add.rectangle(8, -9, 10, 4, 0x2d4c1e);
+            let zArmR = this.add.rectangle(8, 9, 10, 4, 0x2d4c1e);
+
+            // Сохраняем оригинальные цвета для сброса после урона кислоты
+            zBody.originalColor = 0x2d4c1e; zHead.originalColor = 0x3a5c23;
+            zArmL.originalColor = 0x2d4c1e; zArmR.originalColor = 0x2d4c1e;
+
+            zombie.add([zArmL, zArmR, zBody, zHead]);
+            this.physics.add.existing(zombie);
+            zombie.body.setSize(20, 20);
+            zombie.body.setCollideWorldBounds(true);
+            zombie.body.setBounce(1);
+
+            zombie.hp = hp;
+            zombie.isGuard = isGuard;
+            zombie.guardX = gx; zombie.guardY = gy;
+            zombie.isChasing = false;
+            zombie.isBoss = false;
+
+            return zombie;
         }
 
         getZombieHp() {
@@ -428,9 +513,8 @@
                 attempts++;
                 let tx = Phaser.Math.Between(1, this.mapGrid.length - 2), ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
                 
-                // Проверяем, что клетка свободна, и занимаем её, чтобы не было наложений
                 if (this.mapGrid[tx][ty] === 0 || this.mapGrid[tx][ty] === 3) {
-                    this.mapGrid[tx][ty] = 4; // Метка занятости флешкой
+                    this.mapGrid[tx][ty] = 4; // Защита от дублей флешек
                     
                     let intelX = tx * 32 + 16, intelY = ty * 32 + 16;
                     let intel = this.add.circle(intelX, intelY, 6, 0x0000ff);
@@ -438,12 +522,9 @@
                     
                     let guardCount = Phaser.Math.Between(2, 3);
                     for(let i=0; i<guardCount; i++) {
-                        let guard = this.add.circle(intelX + Phaser.Math.Between(-20, 20), intelY + Phaser.Math.Between(-20, 20), 10, 0xff0000);
-                        this.physics.add.existing(guard);
-                        guard.body.setCollideWorldBounds(true);
-                        guard.body.setBounce(1);
-                        guard.hp = this.getZombieHp();
-                        guard.isGuard = true; guard.guardX = intelX; guard.guardY = intelY; guard.isChasing = false;
+                        let zx = intelX + Phaser.Math.Between(-20, 20);
+                        let zy = intelY + Phaser.Math.Between(-20, 20);
+                        let guard = this.createZombieVisual(zx, zy, this.getZombieHp(), true, intelX, intelY);
                         this.zombiesGroup.add(guard);
                     }
                     spawned++;
@@ -457,14 +538,33 @@
                 attempts++;
                 let tx = Phaser.Math.Between(1, this.mapGrid.length - 2), ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
                 if (this.mapGrid[tx][ty] === 0 || this.mapGrid[tx][ty] === 3) {
-                    let zombie = this.add.circle(tx * 32 + 16, ty * 32 + 16, 10, 0xff0000);
-                    this.physics.add.existing(zombie);
-                    zombie.body.setCollideWorldBounds(true);
-                    zombie.body.setBounce(1);
-                    zombie.hp = this.getZombieHp();
-                    zombie.isGuard = false; zombie.isChasing = false;
+                    let zx = tx * 32 + 16, zy = ty * 32 + 16;
+                    let zombie = this.createZombieVisual(zx, zy, this.getZombieHp(), false, 0, 0);
                     this.zombiesGroup.add(zombie);
                     spawned++;
+                }
+            }
+        }
+
+        spawnBoss() {
+            this.bossSpawned = true;
+            this.addLogMessage('ВНИМАНИЕ', 'БИОЛОГИЧЕСКАЯ УГРОЗА! Обнаружен БОСС!', '#ff0000');
+            
+            // Ищем свободное место вдали от игрока
+            let spawned = false;
+            while (!spawned) {
+                let tx = Phaser.Math.Between(1, this.mapGrid.length - 2);
+                let ty = Phaser.Math.Between(1, this.mapGrid[0].length - 2);
+                if (this.mapGrid[tx][ty] === 0 || this.mapGrid[tx][ty] === 3) {
+                    let bx = tx * 32 + 16, by = ty * 32 + 16;
+                    // Босс - огромная туша
+                    let boss = this.createZombieVisual(bx, by, 25 + this.playerStats.level * 5, false, 0, 0);
+                    boss.setScale(2);
+                    boss.isBoss = true;
+                    // Красим босса в зловещий красный
+                    boss.each(c => { if(c.setFillStyle) c.setFillStyle(0x660000); c.originalColor = 0x660000; });
+                    this.zombiesGroup.add(boss);
+                    spawned = true;
                 }
             }
         }
@@ -493,6 +593,22 @@
                     this.tweens.add({ targets: handContainer, alpha: 0.6, duration: 800, yoyo: true, repeat: -1 });
                     spawned = true;
                 }
+            }
+        }
+
+        // Фунция разброса лута фонтаном (для Упыря и Босса)
+        scatterLoot(group, count, color, size, x, y, type = 'basic') {
+            for(let i=0; i<count; i++) {
+                let angle = Math.random() * Math.PI * 2;
+                let dist = Phaser.Math.Between(30, 150);
+                let lx = x + Math.cos(angle) * dist;
+                let ly = y + Math.sin(angle) * dist;
+
+                let obj;
+                if (type === 'chip') obj = this.createChipVisual(lx, ly);
+                else obj = this.add.circle(lx, ly, size, color);
+                
+                group.add(obj);
             }
         }
 
@@ -556,10 +672,10 @@
                 
                 for(let i=0; i<15; i++) {
                     let rand = Phaser.Math.Between(1, 100);
-                    if (rand <= 40) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5); 
-                    else if (rand <= 90) this.spawnObjectsOnGrid(this.chipsGroup, 1, 0x00ffff, 6); 
-                    else if (rand <= 95) this.spawnObjectsOnGrid(this.armorGroup, 1, 0xc0c0c0, 6); 
-                    else this.spawnObjectsOnGrid(this.heartsGroup, 1, 0xff0055, 8);
+                    if (rand <= 40) this.scatterLoot(this.coinsGroup, 1, 0xffd700, 5, this.npc.x, this.npc.y);
+                    else if (rand <= 90) this.scatterLoot(this.chipsGroup, 1, null, null, this.npc.x, this.npc.y, 'chip');
+                    else if (rand <= 95) this.scatterLoot(this.armorGroup, 1, 0xc0c0c0, 6, this.npc.x, this.npc.y);
+                    else this.scatterLoot(this.heartsGroup, 1, 0xff0055, 8, this.npc.x, this.npc.y);
                 }
                 this.updateUI();
                 this.lastNpcTalkTime = this.time.now;
@@ -569,16 +685,15 @@
             let slugsToTrade = this.playerStats.slugs;
             if (slugsToTrade > 0) {
                 let amountToSpawn = 0;
-                // С одного слизня от 2 до 3 единиц лута
                 for(let i=0; i<slugsToTrade; i++) amountToSpawn += Phaser.Math.Between(2, 3);
                 
                 for(let i=0; i<amountToSpawn; i++) {
                     let rand = Phaser.Math.Between(1, 100);
                     // 40% монеты, 50% микросхемы, 5% броня, 5% сердечки
-                    if (rand <= 40) this.spawnObjectsOnGrid(this.coinsGroup, 1, 0xffd700, 5);
-                    else if (rand <= 90) this.spawnObjectsOnGrid(this.chipsGroup, 1, 0x00ffff, 6);
-                    else if (rand <= 95) this.spawnObjectsOnGrid(this.armorGroup, 1, 0xc0c0c0, 6);
-                    else this.spawnObjectsOnGrid(this.heartsGroup, 1, 0xff0055, 8);
+                    if (rand <= 40) this.scatterLoot(this.coinsGroup, 1, 0xffd700, 5, this.npc.x, this.npc.y);
+                    else if (rand <= 90) this.scatterLoot(this.chipsGroup, 1, null, null, this.npc.x, this.npc.y, 'chip');
+                    else if (rand <= 95) this.scatterLoot(this.armorGroup, 1, 0xc0c0c0, 6, this.npc.x, this.npc.y);
+                    else this.scatterLoot(this.heartsGroup, 1, 0xff0055, 8, this.npc.x, this.npc.y);
                 }
                 this.addLogMessage('Упырь', `Держи ништяки, Агент! Раскидал по округе.`, '#ffaa00');
                 this.playerStats.npcSlugs += slugsToTrade;
@@ -662,15 +777,21 @@
         }
 
         upgradeBackpack() {
-            let rankData = this.RANKS[this.playerStats.rankIndex];
-            if (this.playerStats.maxInventory < rankData.invLimit) {
-                if (this.playerStats.coins >= rankData.cost) {
-                    this.playerStats.coins -= rankData.cost;
-                    this.playerStats.maxInventory = rankData.invLimit;
-                    this.addLogMessage('СИСТЕМА', `Рюкзак расширен до ${rankData.invLimit} слотов!`, '#00ff00');
-                    this.updateUI();
+            let currentBag = this.playerStats.bagLevel;
+            if (currentBag < this.BACKPACKS.length - 1) {
+                let nextBag = this.BACKPACKS[currentBag + 1];
+                if (this.playerStats.rankIndex >= nextBag.reqRank) {
+                    if (this.playerStats.coins >= nextBag.cost) {
+                        this.playerStats.coins -= nextBag.cost;
+                        this.playerStats.bagLevel++;
+                        this.playerStats.maxInventory = nextBag.limit;
+                        this.addLogMessage('СИСТЕМА', `Рюкзак улучшен до ${nextBag.limit} слотов!`, '#00ff00');
+                        this.updateUI();
+                    } else {
+                        this.addLogMessage('СИСТЕМА', `Не хватает монет для улучшения (нужно ${nextBag.cost}).`, '#ff0000');
+                    }
                 } else {
-                    this.addLogMessage('СИСТЕМА', `Не хватает монет для улучшения (нужно ${rankData.cost}).`, '#ff0000');
+                    this.addLogMessage('СИСТЕМА', `Требуется звание: ${this.RANKS[nextBag.reqRank].name}.`, '#ff0000');
                 }
             }
         }
@@ -719,42 +840,55 @@
         shootZombie(bullet, zombie) {
             bullet.destroy();
             zombie.hp--;
-            zombie.setFillStyle(0xffffff);
-            this.time.delayedCall(100, () => zombie.setFillStyle(0xff0000));
+            zombie.each(c => { if(c.setFillStyle) c.setFillStyle(0xffffff); });
+            this.time.delayedCall(100, () => zombie.each(c => { if(c.setFillStyle) c.setFillStyle(c.originalColor); }));
 
-            if (zombie.hp <= 0) {
-                let zx = zombie.x; let zy = zombie.y;
-                zombie.destroy();
-                this.playerStats.kills++;
-                this.checkRankUp();
-                this.updateUI();
-                
+            if (zombie.hp <= 0) this.killZombie(zombie);
+        }
+
+        killZombie(zombie) {
+            let zx = zombie.x; let zy = zombie.y;
+            let isBoss = zombie.isBoss;
+            zombie.destroy();
+            
+            this.playerStats.kills++;
+            this.checkRankUp();
+            this.updateUI();
+            
+            if (isBoss) {
+                this.addLogMessage('ПОБЕДА', 'Босс уничтожен! Лут разбросан!', '#00ff00');
+                this.scatterLoot(this.coinsGroup, Phaser.Math.Between(10, 30), 0xffd700, 5, zx, zy);
+                this.scatterLoot(this.slugsGroup, Phaser.Math.Between(10, 30), 0x00ff00, 6, zx, zy);
+                this.scatterLoot(this.chipsGroup, Phaser.Math.Between(20, 50), null, null, zx, zy, 'chip');
+            } else {
                 let slug = this.add.circle(zx, zy, 6, 0x00ff00);
                 this.slugsGroup.add(slug);
                 
-                // 50% шанс на монеты, роняет 1-2 физические монетки
-                if (Phaser.Math.Between(1, 100) <= 50) {
-                    let numCoins = Phaser.Math.Between(1, 2);
+                // 60% шанс на монеты, роняет 1-3 монетки
+                if (Phaser.Math.Between(1, 100) <= 60) {
+                    let numCoins = Phaser.Math.Between(1, 3);
                     for(let i=0; i<numCoins; i++) {
                         let coin = this.add.circle(zx + Phaser.Math.Between(-10, 10), zy + Phaser.Math.Between(-10, 10), 5, 0xffd700);
                         this.coinsGroup.add(coin);
                     }
                 }
-                
-                // 5% аптечки и броня
                 if (Phaser.Math.Between(1, 100) <= 5) {
                     let heart = this.add.circle(zx + Phaser.Math.Between(-15, 15), zy + Phaser.Math.Between(-15, 15), 8, 0xff0055);
                     this.heartsGroup.add(heart);
                 }
-
                 if (Phaser.Math.Between(1, 100) <= 5) {
                     let arm = this.add.circle(zx + Phaser.Math.Between(-15, 15), zy + Phaser.Math.Between(-15, 15), 6, 0xc0c0c0);
                     this.armorGroup.add(arm);
                 }
             }
+
+            // Спавн Босса, если убит последний враг
+            if (this.zombiesGroup.countActive() === 0 && !this.bossSpawned) {
+                this.spawnBoss();
+            }
         }
 
-        hitPlayer(player, zombie) {
+        hitPlayer(player, source) {
             if (this.isInvulnerable) return;
 
             if (this.playerStats.armor > 0) {
@@ -845,10 +979,19 @@
                 }
             }
 
+            // Логика поэтапного рюкзака
             let btnUpgrade = document.getElementById('btn-upgrade-bag');
-            if (this.playerStats.maxInventory < rankData.invLimit) {
+            let currentBag = this.playerStats.bagLevel;
+            if (currentBag < this.BACKPACKS.length - 1) {
+                let nextBag = this.BACKPACKS[currentBag + 1];
                 btnUpgrade.style.display = 'block';
-                btnUpgrade.innerText = `Улучшить рюкзак (+ до ${rankData.invLimit}) за ${rankData.cost} монет`;
+                if (this.playerStats.rankIndex >= nextBag.reqRank) {
+                    btnUpgrade.innerText = `Рюкзак (до ${nextBag.limit}) за ${nextBag.cost} монет`;
+                    btnUpgrade.disabled = false;
+                } else {
+                    btnUpgrade.innerText = `Рюкзак до ${nextBag.limit} (Нужен ${this.RANKS[nextBag.reqRank].name})`;
+                    btnUpgrade.disabled = true;
+                }
             } else {
                 btnUpgrade.style.display = 'none';
             }
@@ -869,7 +1012,7 @@
             let pointer = this.input.activePointer;
             this.player.rotation = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
 
-            // УМНЫЙ МАГНИТ (Базовый радиус 35 для комфортного сбора)
+            // УМНЫЙ МАГНИТ (Базовый радиус 35)
             let magnetRadius = this.isSuperMagnetActive ? 600 : (35 + (this.playerStats.magnetLevel * 40));
             let invFull = this.getInventoryCount() >= this.playerStats.maxInventory;
             let hpFull = this.playerStats.lives >= 3;
@@ -916,6 +1059,7 @@
                 }
             }
 
+            // Умная логика Зомби (Вращение)
             const zombieSpeed = 40; 
             const aggroSpeed = 70;
             
@@ -943,6 +1087,11 @@
                         let angle = Phaser.Math.Between(0, 360);
                         this.physics.velocityFromAngle(angle, zombieSpeed, zombie.body.velocity);
                     }
+                }
+
+                // Поворот зомби в сторону движения
+                if (zombie.body.velocity.x !== 0 || zombie.body.velocity.y !== 0) {
+                    zombie.rotation = zombie.body.velocity.angle();
                 }
             });
         }
