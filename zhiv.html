@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Wasteland Agent: Cyber & Minigun</title>
+    <title>Wasteland Agent: Save & Load</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         body { 
@@ -113,6 +113,14 @@
     </div>
 
     <div class="ui-section">
+        <h3>СИСТЕМА</h3>
+        <div class="chest-controls">
+            <button class="btn-chest" style="background:#030" onclick="window.gameScene.saveGame()">Сохранить</button>
+            <button class="btn-chest" style="background:#003" onclick="window.gameScene.loadGame()">Загрузить</button>
+        </div>
+    </div>
+
+    <div class="ui-section">
         <button id="btn-finish" class="btn-evac" onclick="window.gameScene.finishMission()">ВЫЗВАТЬ ОПЕРГРУППУ (10 флешек)</button>
     </div>
 </div>
@@ -125,6 +133,16 @@
 </div>
 
 <script>
+    // Глобальная переменная для защиты от стрельбы при кликах по UI
+    window.isUIHovered = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.side-panel').forEach(panel => {
+            panel.addEventListener('mouseenter', () => window.isUIHovered = true);
+            panel.addEventListener('mouseleave', () => window.isUIHovered = false);
+        });
+    });
+
     class GameScene extends Phaser.Scene {
         constructor() { super('GameScene'); }
 
@@ -140,7 +158,6 @@
 
             this.MAGNET_COSTS = [200, 450, 800, 1300, 2000];
 
-            // Настройки и цены оружия
             this.WPN_DEFS = [
                 { name: "Нет", dmg: 0, delay: 0, speed: 0, cost: 0, aCost: 0, aGain: 0 },
                 { name: "🔫 Пистолет", dmg: 1, delay: 400, speed: 600, cost: 5, aCost: 2, aGain: 20 },
@@ -179,7 +196,7 @@
             this.isNearDrone = false;
             this.bossSpawned = false;
             this.cheatBuffer = '';
-            this.lastFired = 0; // Для автоогня
+            this.lastFired = 0;
 
             this.npcJokes = [
                 "Пули — это хорошо. Но слизни надежнее.",
@@ -199,7 +216,6 @@
             bgGraphics.fillStyle(0x111111, 1);
             bgGraphics.fillRect(0, 0, worldWidth, worldHeight);
 
-            // Забор
             for (let x = 0; x < GRID_SIZE; x++) {
                 for (let y = 0; y < GRID_SIZE; y++) {
                     if (x === 0 || x === GRID_SIZE - 1 || y === 0 || y === GRID_SIZE - 1) {
@@ -329,6 +345,7 @@
             }
 
             let wandererCount = Math.floor(20 * Math.pow(1.15, this.playerStats.level - 1));
+
             this.spawnRandomLoot('slug', 25);
             this.spawnRandomLoot('heart', 3);
             this.spawnIntelAndGuards(10);
@@ -389,14 +406,11 @@
             }, null, this);
 
             this.physics.add.overlap(this.player, this.npc, this.interactNPC, null, this);
-            
             this.physics.add.overlap(this.player, this.zombiesGroup, this.hitPlayer, null, this);
             this.physics.add.overlap(this.player, this.bossesGroup, this.hitPlayer, null, this);
-            
             this.physics.add.overlap(this.bulletsGroup, this.zombiesGroup, this.shootZombie, null, this);
             this.physics.add.overlap(this.bulletsGroup, this.bossesGroup, this.shootZombie, null, this);
 
-            // КИРКА (R)
             this.input.keyboard.on('keydown-R', () => {
                 if (this.playerStats.bones > 0) {
                     let closestWall = null;
@@ -430,15 +444,27 @@
                         this.player.body.checkCollision.none = true; 
                         this.player.setAlpha(0.6); 
                         
-                        this.addLogMessage('ЧИТ', 'РЕЖИМ БОГА! (+Деньги, Броня, Сквозь стены, Супермагнит на 10 сек)', '#ff00ff');
+                        this.addLogMessage('ЧИТ', 'РЕЖИМ БОГА! (+Деньги, Броня, Сквозь стены, Супермагнит на 20 сек)', '#ff00ff');
                         this.updateUI();
                         this.cheatBuffer = '';
 
-                        this.time.delayedCall(10000, () => {
+                        this.time.delayedCall(20000, () => {
                             this.isSuperMagnetActive = false;
                             this.player.body.checkCollision.none = false;
                             this.player.setAlpha(1);
                         });
+                    }
+                }
+            });
+
+            // Блокировка одиночных кликов (если нужно), но теперь у нас стрельба на зажатие в update()
+            // Для совместимости оставим тут одиночный выстрел, но с проверкой UI
+            this.input.on('pointerdown', (pointer) => {
+                if (window.isUIHovered) return; // ЗАЩИТА ОТ СТРЕЛЬБЫ В UI
+                if (this.playerStats.weaponLevel > 0) {
+                    let wDef = this.WPN_DEFS[this.playerStats.weaponLevel];
+                    if (this.time.now > this.lastFired + wDef.delay) {
+                        this.fireWeapon(pointer, wDef);
                     }
                 }
             });
@@ -454,6 +480,53 @@
 
             this.cursors = this.input.keyboard.createCursorKeys();
             this.wasd = this.input.keyboard.addKeys('W,A,S,D');
+        }
+
+        saveGame() {
+            localStorage.setItem('wasteland_save', JSON.stringify(this.playerStats));
+            this.addLogMessage('СИСТЕМА', 'Прогресс успешно сохранен.', '#00ff00');
+        }
+
+        loadGame() {
+            let data = localStorage.getItem('wasteland_save');
+            if (data) {
+                let parsedStats = JSON.parse(data);
+                this.addLogMessage('СИСТЕМА', 'Загрузка данных...', '#00ff00');
+                this.time.delayedCall(1000, () => {
+                    document.getElementById('log-messages').innerHTML = '';
+                    this.scene.restart({ playerStats: parsedStats });
+                });
+            } else {
+                this.addLogMessage('СИСТЕМА', 'Нет сохраненных данных.', '#ff0000');
+            }
+        }
+
+        fireWeapon(pointer, wDef) {
+            if (this.playerStats.ammo > 0) {
+                this.playerStats.ammo--;
+                this.updateUI();
+                
+                let angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
+                if (this.playerStats.weaponLevel === 3) angle += Phaser.Math.FloatBetween(-0.15, 0.15);
+
+                let bulletX = this.player.x + Math.cos(angle) * 16;
+                let bulletY = this.player.y + Math.sin(angle) * 16;
+
+                let color = this.playerStats.weaponLevel === 3 ? 0xffffff : (this.playerStats.weaponLevel === 2 ? 0xff8800 : 0xffd700);
+                let size = this.playerStats.weaponLevel === 3 ? 3 : (this.playerStats.weaponLevel === 2 ? 5 : 4);
+                
+                let bullet = this.add.circle(bulletX, bulletY, size, color);
+                this.physics.add.existing(bullet);
+                bullet.damage = wDef.dmg;
+                
+                this.bulletsGroup.add(bullet);
+                this.physics.velocityFromAngle(Phaser.Math.RadToDeg(angle), wDef.speed, bullet.body.velocity);
+                
+                this.lastFired = this.time.now;
+            } else if (this.time.now > this.lastDroneAction + 1000) {
+                this.addLogMessage('Система', 'Нет патронов!', '#ff0000');
+                this.lastDroneAction = this.time.now;
+            }
         }
 
         addLogMessage(sender, text, color) {
@@ -563,7 +636,7 @@
             let cArm2 = this.add.rectangle(12, 10, 8, 4, 0x778899);
 
             container.add([cBody, cHead, cEye, cArm1, cArm2]);
-            container.hp = this.getZombieHp() * 3; // В 3 раза жирнее!
+            container.hp = this.getZombieHp() * 3; 
             container.isGuard = false; container.isChasing = false; container.lastAcidHit = 0;
             container.isBoss = false; container.isSkeleton = false; container.isCyber = true;
 
@@ -960,8 +1033,16 @@
             let maxWpn = this.playerStats.level >= 16 ? 3 : (this.playerStats.level >= 11 ? 2 : 1);
             if (this.playerStats.weaponLevel < maxWpn) {
                 let def = this.WPN_DEFS[maxWpn];
-                if (this.playerStats.chips >= def.cost) {
-                    this.playerStats.chips -= def.cost;
+                
+                if (this.playerStats.chips + this.playerStats.chestChips >= def.cost) {
+                    if (this.playerStats.chips >= def.cost) {
+                        this.playerStats.chips -= def.cost;
+                    } else {
+                        let rem = def.cost - this.playerStats.chips;
+                        this.playerStats.chips = 0;
+                        this.playerStats.chestChips -= rem;
+                    }
+                    
                     this.playerStats.weaponLevel = maxWpn;
                     this.playerStats.ammo += def.aGain;
                     document.getElementById('weapon-section').style.display = 'block';
@@ -976,8 +1057,16 @@
         buyAmmo() {
             if (this.playerStats.weaponLevel > 0) {
                 let def = this.WPN_DEFS[this.playerStats.weaponLevel];
-                if (this.playerStats.chips >= def.aCost) {
-                    this.playerStats.chips -= def.aCost;
+                
+                if (this.playerStats.chips + this.playerStats.chestChips >= def.aCost) {
+                    if (this.playerStats.chips >= def.aCost) {
+                        this.playerStats.chips -= def.aCost;
+                    } else {
+                        let rem = def.aCost - this.playerStats.chips;
+                        this.playerStats.chips = 0;
+                        this.playerStats.chestChips -= rem;
+                    }
+                    
                     this.playerStats.ammo += def.aGain;
                     this.addLogMessage('ДРОН', `+${def.aGain} патронов.`, '#00ffff');
                     this.updateUI();
@@ -990,8 +1079,8 @@
         exchangeChips() {
             if (this.playerStats.coins >= 150) {
                 this.playerStats.coins -= 150;
-                this.playerStats.chips += 10;
-                this.addLogMessage('ДРОН', 'Обмен успешен: -150 монет, +10 микросхем.', '#00ffff');
+                this.playerStats.chestChips += 10;
+                this.addLogMessage('ДРОН', 'Обмен успешен: -150 монет, +10 микросхем (в сундук).', '#00ffff');
                 this.updateUI();
             } else {
                 this.addLogMessage('ДРОН', 'Не хватает монет (нужно 150).', '#ff0000');
@@ -1055,14 +1144,12 @@
                     this.updateUI();
                     
                     if (isSkel) {
-                        // 70% монет с шансом 1-3 штуки
                         if (Phaser.Math.Between(1, 100) <= 70) {
                             let numCoins = Phaser.Math.Between(1, 3);
                             for(let i=0; i<numCoins; i++) this.spawnLootInRadius('coin', zx, zy, 5, 15);
                         }
                         if (Phaser.Math.Between(1, 100) <= 15) this.spawnLootInRadius('bones', zx, zy, 5, 15);
                     } else if (isCyber) {
-                        // Киберзомби - Элитный лут
                         let chipAmt = Phaser.Math.Between(3, 6);
                         for(let i=0; i<chipAmt; i++) this.spawnLootInRadius('chip', zx, zy, 5, 20);
                         let coinAmt = Phaser.Math.Between(2, 4);
@@ -1192,7 +1279,6 @@
                 btnUpgrade.style.display = 'none';
             }
 
-            // Логика кнопок Дрона
             document.getElementById('btn-drone-wpn').disabled = !this.isNearDrone;
             document.getElementById('btn-drone-ammo').disabled = !this.isNearDrone;
             document.getElementById('btn-drone-exch').disabled = !this.isNearDrone;
@@ -1232,37 +1318,11 @@
             let pointer = this.input.activePointer;
             this.player.rotation = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
 
-            // АВТООГОНЬ ПРИ ЗАЖАТОЙ МЫШИ
-            if (pointer.isDown && this.playerStats.weaponLevel > 0) {
+            // АВТООГОНЬ С ЗАЩИТОЙ ОТ КЛИКОВ ПО UI
+            if (pointer.isDown && this.playerStats.weaponLevel > 0 && !window.isUIHovered) {
                 let wDef = this.WPN_DEFS[this.playerStats.weaponLevel];
                 if (this.time.now > this.lastFired + wDef.delay) {
-                    if (this.playerStats.ammo > 0) {
-                        this.playerStats.ammo--;
-                        this.updateUI();
-                        
-                        let angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
-                        
-                        // Разброс для шестистволки
-                        if (this.playerStats.weaponLevel === 3) angle += Phaser.Math.FloatBetween(-0.15, 0.15);
-
-                        let bulletX = this.player.x + Math.cos(angle) * 16;
-                        let bulletY = this.player.y + Math.sin(angle) * 16;
-
-                        let color = this.playerStats.weaponLevel === 3 ? 0xffffff : (this.playerStats.weaponLevel === 2 ? 0xff8800 : 0xffd700);
-                        let size = this.playerStats.weaponLevel === 3 ? 3 : (this.playerStats.weaponLevel === 2 ? 5 : 4);
-                        
-                        let bullet = this.add.circle(bulletX, bulletY, size, color);
-                        this.physics.add.existing(bullet);
-                        bullet.damage = wDef.dmg;
-                        
-                        this.bulletsGroup.add(bullet);
-                        this.physics.velocityFromAngle(Phaser.Math.RadToDeg(angle), wDef.speed, bullet.body.velocity);
-                        
-                        this.lastFired = this.time.now;
-                    } else if (this.time.now > this.lastDroneAction + 1000) {
-                        this.addLogMessage('Система', 'Нет патронов!', '#ff0000');
-                        this.lastDroneAction = this.time.now;
-                    }
+                    this.fireWeapon(pointer, wDef);
                 }
             }
 
