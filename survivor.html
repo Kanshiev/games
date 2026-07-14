@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 4.0</title>
+    <title>Survivor.io - Alpha 4.1</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -123,7 +123,7 @@ const WORLD_HEIGHT = 3000;
 let player = { 
     x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, radius: 16, hp: 100, maxHp: 100, 
     armor: 0, maxArmor: 100, weapon: 'pistol', grenades: 0, speed: 4, shootCooldown: 0, 
-    hasSaws: false, sawAngle: 0 
+    hasSaws: false, sawAngle: 0, sawCount: 3, sawRadius: 60
 };
 let bullets = []; let zombies = []; let enemyProjectiles = []; let items = []; 
 let thrownGrenades = []; let explosions = []; 
@@ -173,7 +173,10 @@ function loadGame() {
     const parsed = JSON.parse(data);
     
     player = parsed.player;
-    if (player.grenades === undefined) player.grenades = 0; // Для совместимости старых сейвов
+    if (player.grenades === undefined) player.grenades = 0; 
+    if (player.sawCount === undefined) player.sawCount = 3;
+    if (player.sawRadius === undefined) player.sawRadius = 60;
+    
     currentLevel = parsed.currentLevel;
     waveIndex = parsed.waveIndex;
     
@@ -189,7 +192,8 @@ function initGame() {
     player = {
         x: WORLD_WIDTH/2, y: WORLD_HEIGHT/2, radius: 16, speed: 4,
         hp: 100, maxHp: 100, armor: 0, maxArmor: 100, grenades: 0,
-        shootCooldown: 0, weapon: 'pistol', hasSaws: false, sawAngle: 0
+        shootCooldown: 0, weapon: 'pistol', hasSaws: false, sawAngle: 0,
+        sawCount: 3, sawRadius: 60
     };
     bullets = []; zombies = []; enemyProjectiles = []; items = []; thrownGrenades = []; explosions = [];
     keys = {}; currentLevel = 1; waveIndex = 0;
@@ -200,15 +204,15 @@ function initGame() {
 }
 
 function getWeaponStats() {
-    if (player.weapon === 'pistol') return { speed: 40, damage: 1, name: 'Пистолет' };
-    if (player.weapon === 'machine_gun') return { speed: 10, damage: 2, name: 'Пулемет' };
-    if (player.weapon === 'minigun') return { speed: 4, damage: 1.5, name: 'Миниган' };
+    if (player.weapon === 'pistol') return { speed: 40, damage: 1, name: 'Пистолет', pierce: false };
+    if (player.weapon === 'machine_gun') return { speed: 10, damage: 2, name: 'Пулемет', pierce: false };
+    if (player.weapon === 'minigun') return { speed: 4, damage: 1.5, name: 'Миниган', pierce: false };
+    if (player.weapon === 'plasma_cutter') return { speed: 8, damage: 3, name: 'Плазменный резак', pierce: true };
 }
 
 function throwPlayerGrenade() {
     if (!isGameRunning || isPaused || player.grenades <= 0) return;
     
-    // Ищем цель (приоритет - босс)
     let target = zombies.find(z => z.type === 'boss');
     if (!target) {
         let minDist = Infinity;
@@ -218,14 +222,14 @@ function throwPlayerGrenade() {
         }
     }
     
-    if (!target) return; // Нет врагов
+    if (!target) return; 
     
     player.grenades--;
     thrownGrenades.push({
         x: player.x, y: player.y,
         startX: player.x, startY: player.y,
         targetX: target.x, targetY: target.y,
-        timer: 20 // Время полета
+        timer: 20 
     });
 }
 
@@ -260,15 +264,20 @@ function spawnEnemy(type) {
             2: {name: "ПЛЕВАЛЬЩИК", hp: 250, rad: 35, speed: 0.7, bType: 'spitter'},
             3: {name: "БАРМАГЛОТ", hp: 800, rad: 45, speed: 0.8, bType: 'barmaglot'},
             4: {name: "ТОКСИЧНЫЙ ТИМЛИД", hp: 1200, rad: 40, speed: 0.9},
-            5: {name: "КОУЧ УСПЕШНОГО УСПЕХА", hp: 1500, rad: 42, speed: 1.0},
-            6: {name: "ДЕД ИНСАЙД", hp: 2000, rad: 35, speed: 1.2},
-            7: {name: "КРОВАКРЫЛ", hp: 3000, rad: 30, speed: 1.8, bType: 'bloodwing'},
-            8: {name: "БАТЯ С РЕМНЕМ", hp: 4500, rad: 40, speed: 1.3},
-            9: {name: "САНТЕХНИК МИХАЛЫЧ", hp: 6000, rad: 45, speed: 0.8},
-            10: {name: "МЕХА-СТРАЖ", hp: 8000, rad: 50, speed: 0.9, bType: 'mecha'}
+            5: {name: "КОУЧ УСПЕШНОГО УСПЕХА", hp: 1700, rad: 42, speed: 1.0},
+            6: {name: "ДЕД ИНСАЙД", hp: 2300, rad: 35, speed: 1.2},
+            7: {name: "КРОВАКРЫЛ", hp: 3500, rad: 30, speed: 1.8, bType: 'bloodwing'},
+            8: {name: "БАТЯ С РЕМНЕМ", hp: 5000, rad: 40, speed: 1.3},
+            9: {name: "САНТЕХНИК МИХАЛЫЧ", hp: 7000, rad: 45, speed: 0.8},
+            10: {name: "МЕХА-СТРАЖ", hp: 10000, rad: 50, speed: 0.9, bType: 'mecha'},
+            11: {name: "БИЗНЕС-АНГЕЛ НА МЕРСЕ", hp: 13000, rad: 45, speed: 1.2},
+            12: {name: "ДУШНЫЙ КОЛЛЕГА", hp: 17000, rad: 40, speed: 0.9},
+            13: {name: "КАРЕН ИЗ БУХГАЛТЕРИИ", hp: 22000, rad: 42, speed: 1.0},
+            14: {name: "ИНФОЦЫГАН НА САМОКАТЕ", hp: 28000, rad: 38, speed: 1.5},
+            15: {name: "ГЕНДИРЕКТОР ОАО 'МРАК'", hp: 35000, rad: 52, speed: 1.0}
         };
 
-        let conf = bossConfigs[currentLevel] || {name: `МУТАНТ УР. ${currentLevel}`, hp: 1000*currentLevel, rad: 40, speed: 0.8};
+        let conf = bossConfigs[currentLevel] || {name: `СВЕРХМУТАНТ УР. ${currentLevel}`, hp: 35000 + (currentLevel - 15) * 5000, rad: 45, speed: 1.0};
         
         boss.name = conf.name; boss.radius = conf.rad; boss.speed = conf.speed; 
         boss.hp = conf.hp; boss.maxHp = conf.hp; boss.bossType = conf.bType || 'generic';
@@ -301,8 +310,9 @@ function update() {
     // Пилы
     if (player.hasSaws) {
         player.sawAngle += 0.05;
+        const orbitRadius = player.sawRadius || 60;
         for (let z of zombies) {
-            if (Math.hypot(player.x - z.x, player.y - z.y) <= 80) {
+            if (Math.hypot(player.x - z.x, player.y - z.y) <= (orbitRadius + 20)) {
                 z.hp -= 0.5; 
                 if (z.hp <= 0 && !z.deadMark) z.deadMark = true; 
             }
@@ -320,7 +330,14 @@ function update() {
     if (player.shootCooldown === 0 && nearestZombie) {
         let stats = getWeaponStats();
         const angle = Math.atan2(nearestZombie.y - player.y, nearestZombie.x - player.x);
-        bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle) * 12, vy: Math.sin(angle) * 12, radius: 4, dmg: stats.damage });
+        bullets.push({ 
+            x: player.x, y: player.y, 
+            vx: Math.cos(angle) * 12, vy: Math.sin(angle) * 12, 
+            radius: player.weapon === 'plasma_cutter' ? 8 : 4, 
+            dmg: stats.damage, 
+            pierce: stats.pierce,
+            hitEnemies: [] 
+        });
         player.shootCooldown = stats.speed;
     }
 
@@ -333,10 +350,18 @@ function update() {
         let hit = false;
         for (let j = zombies.length - 1; j >= 0; j--) {
             let z = zombies[j];
+            if (b.pierce && b.hitEnemies.includes(z)) continue;
+
             if (Math.hypot(b.x - z.x, b.y - z.y) < b.radius + z.radius) {
-                z.hp -= b.dmg; hit = true;
+                z.hp -= b.dmg; 
                 if (z.hp <= 0) z.deadMark = true;
-                break;
+                
+                if (b.pierce) {
+                    b.hitEnemies.push(z);
+                } else {
+                    hit = true;
+                    break;
+                }
             }
         }
         if (hit) bullets.splice(i, 1);
@@ -350,15 +375,15 @@ function update() {
             g.x += (g.targetX - g.startX) / 20;
             g.y += (g.targetY - g.startY) / 20;
         } else {
-            // Взрыв
+            // Взрыв (радиус 100 пикселей)
             for (let z of zombies) {
-                if (Math.hypot(z.x - g.x, z.y - g.y) <= 50) {
-                    if (z.type === 'boss') z.hp -= (z.maxHp * 0.10); // 10% от макс хп
-                    else z.hp -= 150; // Мгновенная смерть для мобов
+                if (Math.hypot(z.x - g.x, z.y - g.y) <= 100) {
+                    if (z.type === 'boss') z.hp -= (z.maxHp * 0.10); 
+                    else z.hp -= 200; 
                     if (z.hp <= 0 && !z.deadMark) z.deadMark = true;
                 }
             }
-            explosions.push({x: g.x, y: g.y, radius: 50, life: 10});
+            explosions.push({x: g.x, y: g.y, radius: 100, life: 10});
             thrownGrenades.splice(i, 1);
         }
     }
@@ -437,7 +462,7 @@ function update() {
         }
     }
 
-    // Предметы
+    // Подбор предметов
     for (let i = items.length - 1; i >= 0; i--) {
         let item = items[i];
         if (Math.hypot(item.x - player.x, item.y - player.y) < player.radius + item.radius) {
@@ -445,6 +470,12 @@ function update() {
             else if (item.type === 'armor_boss') { player.maxArmor = 100; player.armor = 100; levelUp(); } 
             else if (item.type === 'minigun') { player.weapon = 'minigun'; levelUp(); }
             else if (item.type === 'saws') { player.hasSaws = true; levelUp(); }
+            else if (item.type === 'plasma_cutter') { player.weapon = 'plasma_cutter'; levelUp(); }
+            else if (item.type === 'saw_upgrade') {
+                player.sawCount = (player.sawCount || 3) + 1;
+                player.sawRadius = (player.sawRadius || 60) + 10;
+                levelUp();
+            }
             else if (item.type === 'generic_boss_loot') { levelUp(); }
             else if (item.type === 'armor_shard') player.armor = Math.min(player.maxArmor, player.armor + (player.maxArmor * 0.1));
             else if (item.type === 'medkit') player.hp = Math.min(player.maxHp, player.hp + (player.maxHp * 0.05));
@@ -454,7 +485,7 @@ function update() {
         }
     }
 
-    const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'generic_boss_loot'];
+    const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'saw_upgrade', 'generic_boss_loot'];
     if (zombies.length === 0 && !items.some(i => bossLootTypes.includes(i.type))) {
         if (waveIndex < waveBaseCounts.length) {
             waveIndex++; spawnWave();
@@ -478,9 +509,11 @@ function killZombie(z) {
         else if (currentLevel === 2) items.push({ type: 'armor_boss', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel === 7) items.push({ type: 'minigun', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel === 10) items.push({ type: 'saws', x: z.x, y: z.y, radius: 25 });
+        else if (currentLevel === 13) items.push({ type: 'plasma_cutter', x: z.x, y: z.y, radius: 25 });
+        else if (currentLevel > 10) items.push({ type: 'saw_upgrade', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel !== 3) items.push({ type: 'generic_boss_loot', x: z.x, y: z.y, radius: 25 });
     } else {
-        if (Math.random() < 0.02) items.push({ type: 'player_grenade_pickup', x: z.x, y: z.y, radius: 10 }); // 2% граната
+        if (Math.random() < 0.02) items.push({ type: 'player_grenade_pickup', x: z.x, y: z.y, radius: 10 }); 
         if (currentLevel >= 3 && Math.random() < 0.1) items.push({ type: 'armor_shard', x: z.x, y: z.y, radius: 10 });
         if (currentLevel >= 4 && Math.random() < 0.05) items.push({ type: 'medkit', x: z.x, y: z.y, radius: 10 });
     }
@@ -529,6 +562,8 @@ function draw() {
         else if (item.type === 'armor_boss') { ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); } 
         else if (item.type === 'minigun') { ctx.fillStyle = '#e67e22'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'saws') { ctx.fillStyle = '#9b59b6'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
+        else if (item.type === 'plasma_cutter') { ctx.fillStyle = '#00ffff'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
+        else if (item.type === 'saw_upgrade') { ctx.fillStyle = '#ff4757'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'generic_boss_loot') { ctx.fillStyle = '#bdc3c7'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'armor_shard') { ctx.fillStyle = '#85c1e9'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'medkit') {
@@ -537,18 +572,24 @@ function draw() {
         }
         else if (item.type === 'player_grenade_pickup') {
             ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#e67e22'; ctx.fillRect(-2, -8, 4, 4); // чека
+            ctx.fillStyle = '#e67e22'; ctx.fillRect(-2, -8, 4, 4); 
         }
         ctx.restore();
         
-        const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'generic_boss_loot'];
+        const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'saw_upgrade', 'generic_boss_loot'];
         if (bossLootTypes.includes(item.type)) {
-            ctx.fillStyle = '#fff'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
-            ctx.fillText("ЛУТ!", item.x - cameraX, item.y - cameraY - 30);
+            ctx.fillStyle = '#fff'; ctx.font = '14px Arial'; ctx.textAlign = 'center';
+            if (item.type === 'saw_upgrade') {
+                ctx.fillText("+1 К СТРАЖУ!", item.x - cameraX, item.y - cameraY - 30);
+            } else if (item.type === 'plasma_cutter') {
+                ctx.fillText("РЕЗАК!", item.x - cameraX, item.y - cameraY - 30);
+            } else {
+                ctx.fillText("ЛУТ!", item.x - cameraX, item.y - cameraY - 30);
+            }
         }
     }
 
-    // Взрывы от гранат
+    // Взрывы от гранат (визуальный радиус 100)
     for(let ex of explosions) {
         ctx.fillStyle = `rgba(230, 126, 34, ${ex.life/10})`;
         ctx.beginPath(); ctx.arc(ex.x - cameraX, ex.y - cameraY, ex.radius, 0, Math.PI*2); ctx.fill();
@@ -570,11 +611,21 @@ function draw() {
         }
     }
 
-    ctx.fillStyle = '#f1c40f';
+    // Пули игрока
     for (let b of bullets) {
-        ctx.beginPath(); ctx.arc(b.x - cameraX, b.y - cameraY, b.radius, 0, Math.PI*2); ctx.fill();
+        if (player.weapon === 'plasma_cutter') {
+            ctx.fillStyle = '#00ffff'; 
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 10;
+            ctx.beginPath(); ctx.arc(b.x - cameraX, b.y - cameraY, b.radius, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0; 
+        } else {
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath(); ctx.arc(b.x - cameraX, b.y - cameraY, b.radius, 0, Math.PI*2); ctx.fill();
+        }
     }
 
+    // Зомби
     for (let z of zombies) {
         if (z.type === 'normal') ctx.fillStyle = '#27ae60';
         else if (z.bossType === 'fatty') ctx.fillStyle = '#8e44ad'; 
@@ -582,7 +633,7 @@ function draw() {
         else if (z.bossType === 'barmaglot') ctx.fillStyle = '#c0392b'; 
         else if (z.bossType === 'bloodwing') ctx.fillStyle = '#8e0000';
         else if (z.bossType === 'mecha') ctx.fillStyle = '#34495e';
-        else ctx.fillStyle = '#555'; 
+        else ctx.fillStyle = '#d35400'; 
 
         ctx.beginPath(); ctx.arc(z.x - cameraX, z.y - cameraY, z.radius, 0, Math.PI*2); ctx.fill();
 
@@ -597,7 +648,7 @@ function draw() {
             ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
             ctx.fillText(z.name, z.x - cameraX, z.y - cameraY - z.radius - 12);
             
-            const bWidth = 50;
+            const bWidth = 60;
             ctx.fillStyle = '#7f8c8d'; ctx.fillRect(z.x - cameraX - bWidth/2, z.y - cameraY - z.radius - 8, bWidth, 5);
             ctx.fillStyle = '#e74c3c'; ctx.fillRect(z.x - cameraX - bWidth/2, z.y - cameraY - z.radius - 8, bWidth * (z.hp/z.maxHp), 5);
         } else if (z.hp < z.maxHp) {
@@ -606,6 +657,7 @@ function draw() {
         }
     }
 
+    // Игрок
     ctx.save(); ctx.translate(player.x - cameraX, player.y - cameraY);
     ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.arc(0, 0, player.radius, 0, Math.PI*2); ctx.fill();
     let target = zombies.reduce((acc, curr) => Math.hypot(curr.x-player.x, curr.y-player.y) < Math.hypot(acc.x-player.x, acc.y-player.y) ? curr : acc, {x: Infinity, y: Infinity});
@@ -616,11 +668,15 @@ function draw() {
     else if (player.weapon === 'machine_gun') ctx.fillRect(8, -4, 22, 8);
     else if (player.weapon === 'minigun') {
         ctx.fillRect(8, -5, 26, 10); ctx.fillStyle = '#e67e22'; ctx.fillRect(20, -6, 16, 12); 
+    } else if (player.weapon === 'plasma_cutter') {
+        ctx.fillStyle = '#8e44ad'; ctx.fillRect(8, -4, 28, 8); 
+        ctx.fillStyle = '#00ffff'; ctx.fillRect(14, -2, 22, 4); 
     }
     ctx.restore();
 
     if (player.hasSaws) {
-        const sawCount = 3; const orbitRadius = 60;
+        const sawCount = player.sawCount || 3; 
+        const orbitRadius = player.sawRadius || 60;
         for(let i=0; i<sawCount; i++) {
             let sAngle = player.sawAngle + (i * Math.PI * 2 / sawCount);
             let sx = player.x - cameraX + Math.cos(sAngle) * orbitRadius;
@@ -634,14 +690,10 @@ function draw() {
         }
     }
     
-    // Отрисовка экрана паузы поверх игры
-    if (isPaused) {
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 40px "Courier New"';
-        ctx.textAlign = 'center';
-        ctx.fillText("ПАУЗА", canvas.width/2, canvas.height/2);
+    const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'saw_upgrade', 'generic_boss_loot'];
+    if (items.some(i => bossLootTypes.includes(i.type))) {
+        ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
+        ctx.fillText("ПОДБЕРИТЕ УЛУЧШЕНИЕ ДЛЯ СЛЕДУЮЩЕГО УРОВНЯ!", canvas.width/2, 50);
     }
 }
 
