@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 4.3.1 (Hotfix)</title>
+    <title>Survivor.io - Alpha 5.0 (Delta Time & Speed Multiplier)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -91,6 +91,7 @@
         
         <div style="flex-grow: 1;"></div>
         <div style="color: #888; font-size: 0.75rem; margin-bottom: 10px;">Движение: WASD<br>Гранаты: R<br>Пауза: P</div>
+        <button id="btnSpeed" class="btn" style="background-color: #8e44ad;">Скорость: x1</button>
         <button id="btnPause" class="btn" style="background-color: #f39c12;">Пауза (P)</button>
         <button id="btnSave" class="btn" style="background-color: #2980b9;">Сохранить игру</button>
         <button id="btnLoad" class="btn" style="background-color: #27ae60;">Загрузить игру</button>
@@ -129,7 +130,7 @@ const uiArmorBar = document.getElementById('uiArmorBar');
 const WORLD_WIDTH = 3000;
 const WORLD_HEIGHT = 3000;
 
-// ТУТ МЕНЯЕТСЯ ЛИМИТ СПАВНА МОБОВ!
+// Лимит мобов на экране
 const MAX_ACTIVE_ZOMBIES = 300; 
 
 let player = { 
@@ -143,6 +144,7 @@ let keys = {};
 let currentLevel = 1; let waveIndex = 0; let totalKills = 0;
 let zombiesRemainingToSpawn = 0; 
 let isGameRunning = false; let isPaused = false;
+let gameSpeed = 1;
 
 const waveBaseCounts = [15, 25, 40, 70, 120];
 
@@ -163,6 +165,13 @@ actionBtn.addEventListener('click', () => initGame());
 document.getElementById('btnSave').addEventListener('click', saveGame);
 document.getElementById('btnLoad').addEventListener('click', loadGame);
 document.getElementById('btnPause').addEventListener('click', togglePause);
+
+// Кнопка ускорения игры
+document.getElementById('btnSpeed').addEventListener('click', () => {
+    gameSpeed++;
+    if (gameSpeed > 4) gameSpeed = 1;
+    document.getElementById('btnSpeed').innerText = `Скорость: x${gameSpeed}`;
+});
 
 function togglePause() {
     if (!isGameRunning || player.hp <= 0) return;
@@ -307,22 +316,38 @@ function spawnEnemy(type) {
     }
 }
 
-let lastFrameTime = performance.now();
-const FPS_LIMIT = 60;
-const FRAME_DELAY = 1000 / FPS_LIMIT;
+// === НОВАЯ СИСТЕМА ФИКСИРОВАННОГО ВРЕМЕНИ (FIXED TIME STEP) ===
+let lastTime = performance.now();
+let accumulator = 0;
+const LOGIC_HZ = 165; // Базовая частота, к которой ты привык (165 тиков в секунду)
+const LOGIC_TICK = 1000 / LOGIC_HZ;
 
 function gameLoop(currentTime) {
     requestAnimationFrame(gameLoop);
     
     if (!currentTime) currentTime = performance.now();
-    const delta = currentTime - lastFrameTime;
+    let frameTime = currentTime - lastTime;
+    lastTime = currentTime;
     
-    if (delta >= FRAME_DELAY) {
-        lastFrameTime = currentTime - (delta % FRAME_DELAY); 
-        
+    // Защита от огромных прыжков при сворачивании вкладки (Spiral of Death)
+    if (frameTime > 250) frameTime = 250;
+    
+    // Умножаем прошедшее время на выбранную скорость игры (x1, x2, x3, x4)
+    accumulator += frameTime * gameSpeed;
+    
+    let updated = false;
+    
+    // Обновляем логику столько раз, сколько накопилось тиков
+    while (accumulator >= LOGIC_TICK) {
         if (isGameRunning && !isPaused) {
-            update(); 
+            update();
         }
+        accumulator -= LOGIC_TICK;
+        updated = true;
+    }
+    
+    // Отрисовываем кадр, если логика продвинулась или игра на паузе (чтобы нарисовать меню)
+    if (updated || isPaused) {
         draw(); 
         updateUI();
     }
@@ -746,7 +771,6 @@ function endGame(isVictory) {
     actionBtn.textContent = "Начать заново";
 }
 
-// ЗАПУСК ЦИКЛА ВЕРНУЛСЯ!
 requestAnimationFrame(gameLoop);
 </script>
 
