@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 6.3 (CyberZombonator & Power Laser)</title>
+    <title>Survivor.io - Alpha 6.4 (TURBO x10 Mode)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -211,8 +211,14 @@ actionBtn.addEventListener('click', () => initGame());
 document.getElementById('btnSave').addEventListener('click', saveGame);
 document.getElementById('btnLoad').addEventListener('click', loadGame);
 document.getElementById('btnPause').addEventListener('click', togglePause);
+
+// Кнопка ускорения игры (Сюда добавлен режим x10)
 document.getElementById('btnSpeed').addEventListener('click', () => {
-    gameSpeed++; if (gameSpeed > 4) gameSpeed = 1;
+    if (gameSpeed === 1) gameSpeed = 2;
+    else if (gameSpeed === 2) gameSpeed = 3;
+    else if (gameSpeed === 3) gameSpeed = 4;
+    else if (gameSpeed === 4) gameSpeed = 10;
+    else gameSpeed = 1;
     document.getElementById('btnSpeed').innerText = `Скорость: x${gameSpeed}`;
 });
 
@@ -281,7 +287,6 @@ function getWeaponStats() {
     if (player.weapon === 'plasma_cutter') return { speed: 8, damage: 3, name: 'Плазменный резак', pierce: true };
     if (player.weapon === 'laser_beam') return { 
         continuous: true, 
-        // ЗДЕСЬ МЕНЯЕТСЯ МОЩНОСТЬ ЛУЧА. Увеличь 1.5 на большее значение для усиления.
         damage: 0.5 + (player.laserLevel * 1.5), 
         width: 10 + (player.laserLevel * 4), 
         name: `Луч Смерти (Ур.${player.laserLevel})` 
@@ -337,13 +342,11 @@ function spawnEnemy(type) {
         let isZombonator = false;
         let isCyber = false;
         
-        // Шанс на Зомбонатора (С 28 уровня)
         if (currentLevel >= 28) {
             let zombChance = (currentLevel - 27) * 0.05; 
             if (Math.random() < zombChance) isZombonator = true;
         }
         
-        // Шанс на Киберзомби (С 19 уровня), если не прокнул Зомбонатор
         if (!isZombonator && currentLevel >= 19) {
             let cyberChance = (currentLevel - 18) * 0.05; 
             if (Math.random() < cyberChance) isCyber = true;
@@ -659,7 +662,7 @@ function killZombie(z) {
         else if (currentLevel > 10 && currentLevel !== 18 && currentLevel !== 25) items.push({ type: 'saw_upgrade', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel !== 3) items.push({ type: 'generic_boss_loot', x: z.x, y: z.y, radius: 25 });
     } else if (z.type === 'zombonator') {
-        items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); // 100% дроп
+        items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); 
     } else if (z.type === 'cyber') {
         if (Math.random() < 0.01) items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); 
     } else {
