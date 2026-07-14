@@ -3,100 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha Prototype</title>
+    <title>Survivor.io - Alpha 2.0</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
-            background-color: #111;
-            color: #fff;
+            margin: 0; padding: 0;
+            background-color: #111; color: #fff;
             font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow: hidden;
-            user-select: none;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            min-height: 100vh; overflow: hidden; user-select: none;
         }
         #gameContainer {
             position: relative;
             box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            border: 4px solid #333;
-            border-radius: 8px;
+            border: 4px solid #333; border-radius: 8px;
             background-color: #2e5c1e;
         }
-        canvas {
-            display: block;
-        }
+        canvas { display: block; }
         .overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.85);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            z-index: 10;
+            display: none; flex-direction: column;
+            align-items: center; justify-content: center;
+            text-align: center; z-index: 10;
         }
-        .overlay.active {
-            display: flex;
-        }
-        .overlay h1 {
-            font-size: 3rem;
-            margin-bottom: 20px;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-        }
-        .overlay p {
-            font-size: 1.2rem;
-            margin-bottom: 30px;
-            color: #ccc;
-        }
+        .overlay.active { display: flex; }
+        .overlay h1 { font-size: 3rem; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 3px; }
+        .overlay p { font-size: 1.2rem; margin-bottom: 30px; color: #ccc; }
         .btn {
-            padding: 12px 35px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            text-transform: uppercase;
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
+            padding: 12px 35px; font-size: 1.2rem; font-weight: bold;
+            text-transform: uppercase; background-color: #e74c3c;
+            color: white; border: none; border-radius: 4px;
+            cursor: pointer; transition: background 0.2s, transform 0.1s;
         }
-        .btn:hover {
-            background-color: #c0392b;
-            transform: scale(1.05);
-        }
-        .btn:active {
-            transform: scale(0.95);
-        }
-        #controls-hint {
-            margin-top: 15px;
-            color: #888;
-            font-size: 0.9rem;
-        }
+        .btn:hover { background-color: #c0392b; transform: scale(1.05); }
+        .btn:active { transform: scale(0.95); }
+        #controls-hint { margin-top: 15px; color: #888; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
 <div id="gameContainer">
     <canvas id="gameCanvas" width="800" height="600"></canvas>
-    
-    <!-- Экран старта/смерти/победы -->
     <div id="screenOverlay" class="overlay active">
-        <h1 id="overlayTitle">Zombie Survivor</h1>
-        <p id="overlayDesc">Уничтожь 5 волн зомби по 20 штук в каждой. Удачи!</p>
+        <h1 id="overlayTitle">Wasteland Survivor</h1>
+        <p id="overlayDesc">Пройди 3 уровня. Одолей Бармаглота.</p>
         <button id="actionBtn" class="btn">Начать игру</button>
     </div>
 </div>
-
-<div id="controls-hint">Движение: WASD или Стрелочки. Стрельба автоматическая по ближайшей цели.</div>
+<div id="controls-hint">Движение: WASD / Стрелочки. Автострельба.</div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
@@ -107,348 +62,366 @@ const overlayTitle = document.getElementById('overlayTitle');
 const overlayDesc = document.getElementById('overlayDesc');
 const actionBtn = document.getElementById('actionBtn');
 
-// Размеры мира
 const WORLD_WIDTH = 3000;
 const WORLD_HEIGHT = 3000;
 
-// Игровое состояние
-let player = {
-    x: WORLD_WIDTH / 2,
-    y: WORLD_HEIGHT / 2,
-    radius: 16,
-    speed: 4,
-    hp: 100,
-    maxHp: 100,
-    shootCooldown: 0,
-    shootSpeed: 20 // кадров между выстрелами (~330мс)
-};
+let player, bullets, zombies, enemyProjectiles, items, keys, currentLevel, waveIndex, isGameRunning;
+const waveBaseCounts = [15, 25, 40, 70, 120];
 
-let bullets = [];
-let zombies = [];
-let keys = {};
-
-let currentWave = 1;
-const MAX_WAVES = 5;
-let isGameRunning = false;
-
-// Слушатели клавиатуры
 window.addEventListener('keydown', e => keys[e.code] = true);
 window.addEventListener('keyup', e => keys[e.code] = false);
 
-// Кнопка на экране
-actionBtn.addEventListener('click', () => {
-    initGame();
-});
+actionBtn.addEventListener('click', () => initGame());
 
 function initGame() {
-    player.x = WORLD_WIDTH / 2;
-    player.y = WORLD_HEIGHT / 2;
-    player.hp = player.maxHp;
-    player.shootCooldown = 0;
-    bullets = [];
-    zombies = [];
-    currentWave = 1;
+    player = {
+        x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, radius: 16, speed: 4,
+        hp: 100, maxHp: 100, armor: 0, maxArmor: 100,
+        shootCooldown: 0, 
+        weapon: 'pistol' // 'pistol' или 'machine_gun'
+    };
+    bullets = []; zombies = []; enemyProjectiles = []; items = [];
+    keys = {};
+    currentLevel = 1; waveIndex = 0;
     isGameRunning = true;
-    
     overlay.classList.remove('active');
     spawnWave();
 }
 
+function getWeaponStats() {
+    if (player.weapon === 'pistol') return { speed: 40, damage: 1 }; // Замедлили пистолет
+    if (player.weapon === 'machine_gun') return { speed: 10, damage: 2 }; // Быстрый и сильный пулемет
+}
+
 function spawnWave() {
     zombies = [];
-    for (let i = 0; i < 20; i++) {
-        spawnSingleZombie();
+    if (waveIndex < waveBaseCounts.length) {
+        // Обычная волна
+        let multiplier = Math.pow(1.25, currentLevel - 1);
+        let count = Math.floor(waveBaseCounts[waveIndex] * multiplier);
+        for (let i = 0; i < count; i++) spawnEnemy('normal');
+    } else {
+        // Босс
+        spawnEnemy('boss');
     }
 }
 
-function spawnSingleZombie() {
-    // Спавним за пределами видимости экрана, но внутри мира
+function spawnEnemy(type) {
     const angle = Math.random() * Math.PI * 2;
-    // Радиус спавна чуть больше диагонали экрана (~600px от игрока)
-    const distance = 500 + Math.random() * 300; 
-    
-    let zx = player.x + Math.cos(angle) * distance;
-    let zy = player.y + Math.sin(angle) * distance;
-    
-    // Загоняем в рамки карты
-    zx = Math.max(20, Math.min(WORLD_WIDTH - 20, zx));
-    zy = Math.max(20, Math.min(WORLD_HEIGHT - 20, zy));
-    
-    zombies.push({
-        x: zx,
-        y: zy,
-        radius: 14,
-        speed: 1.5 + Math.random() * 0.5, // разная скорость зомби
-        hp: 3, // 3 попадания из пистолета для смерти
-        maxHp: 3
-    });
+    const distance = 500 + Math.random() * 300;
+    let zx = Math.max(50, Math.min(WORLD_WIDTH - 50, player.x + Math.cos(angle) * distance));
+    let zy = Math.max(50, Math.min(WORLD_HEIGHT - 50, player.y + Math.sin(angle) * distance));
+
+    if (type === 'normal') {
+        zombies.push({
+            type: 'normal', x: zx, y: zy, radius: 14,
+            speed: 0.5 + Math.random() * 0.2, // Уменьшили скорость в 3+ раза
+            hp: 3, maxHp: 3
+        });
+    } else if (type === 'boss') {
+        let boss = { type: 'boss', x: zx, y: zy, timer: 0 };
+        if (currentLevel === 1) {
+            boss.radius = 35; boss.speed = 0.6; boss.hp = 80; boss.maxHp = 80; boss.bossType = 'fatty';
+        } else if (currentLevel === 2) {
+            boss.radius = 35; boss.speed = 0.7; boss.hp = 250; boss.maxHp = 250; boss.bossType = 'spitter';
+        } else if (currentLevel === 3) {
+            boss.radius = 45; boss.speed = 0.8; boss.hp = 800; boss.maxHp = 800; boss.bossType = 'barmaglot';
+        }
+        zombies.push(boss);
+    }
 }
 
-// Главный игровой цикл
 function gameLoop() {
-    update();
-    draw();
-    requestAnimationFrame(gameLoop);
+    update(); draw();
+    if(isGameRunning) requestAnimationFrame(gameLoop);
 }
 
 function update() {
     if (!isGameRunning) return;
 
-    // 1. Движение игрока
-    let dx = 0;
-    let dy = 0;
+    // Движение игрока
+    let dx = 0, dy = 0;
     if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
     if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
     if (keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
     if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
 
-    // Нормализация диагональной скорости
-    if (dx !== 0 && dy !== 0) {
-        dx *= 0.7071;
-        dy *= 0.7071;
-    }
+    if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
+    player.x = Math.max(player.radius, Math.min(WORLD_WIDTH - player.radius, player.x + dx * player.speed));
+    player.y = Math.max(player.radius, Math.min(WORLD_HEIGHT - player.radius, player.y + dy * player.speed));
 
-    player.x += dx * player.speed;
-    player.y += dy * player.speed;
-
-    // Границы карты для игрока
-    player.x = Math.max(player.radius, Math.min(WORLD_WIDTH - player.radius, player.x));
-    player.y = Math.max(player.radius, Math.min(WORLD_HEIGHT - player.radius, player.y));
-
-    // 2. Поиск ближайшего зомби для автострельбы
-    let nearestZombie = null;
-    let minDist = Infinity;
-
+    // Стрельба игрока
+    let nearestZombie = null, minDist = Infinity;
     for (let z of zombies) {
         let dist = Math.hypot(z.x - player.x, z.y - player.y);
-        if (dist < minDist) {
-            minDist = dist;
-            nearestZombie = z;
-        }
+        if (dist < minDist) { minDist = dist; nearestZombie = z; }
     }
 
-    // Стрельба
-    if (player.shootCooldown > 0) {
-        player.shootCooldown--;
-    }
-
+    if (player.shootCooldown > 0) player.shootCooldown--;
     if (player.shootCooldown === 0 && nearestZombie) {
+        let stats = getWeaponStats();
         const angle = Math.atan2(nearestZombie.y - player.y, nearestZombie.x - player.x);
-        bullets.push({
-            x: player.x,
-            y: player.y,
-            vx: Math.cos(angle) * 10,
-            vy: Math.sin(angle) * 10,
-            radius: 4
-        });
-        player.shootCooldown = player.shootSpeed;
+        bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle) * 12, vy: Math.sin(angle) * 12, radius: 4, dmg: stats.damage });
+        player.shootCooldown = stats.speed;
     }
 
-    // 3. Движение пуль и коллизии с зомби
+    // Пули игрока
     for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
-        b.x += b.vx;
-        b.y += b.vy;
+        b.x += b.vx; b.y += b.vy;
+        if (b.x < 0 || b.x > WORLD_WIDTH || b.y < 0 || b.y > WORLD_HEIGHT) { bullets.splice(i, 1); continue; }
 
-        // Удаление пуль за пределами карты
-        if (b.x < 0 || b.x > WORLD_WIDTH || b.y < 0 || b.y > WORLD_HEIGHT) {
-            bullets.splice(i, 1);
-            continue;
-        }
-
-        // Столкновение пули с зомби
         let hit = false;
         for (let j = zombies.length - 1; j >= 0; j--) {
             let z = zombies[j];
-            let dist = Math.hypot(b.x - z.x, b.y - z.y);
-            if (dist < b.radius + z.radius) {
-                z.hp -= 1;
+            if (Math.hypot(b.x - z.x, b.y - z.y) < b.radius + z.radius) {
+                z.hp -= b.dmg;
                 hit = true;
-                if (z.hp <= 0) {
-                    zombies.splice(j, 1);
-                }
+                if (z.hp <= 0) killZombie(j);
                 break;
             }
         }
+        if (hit) bullets.splice(i, 1);
+    }
 
-        if (hit) {
-            bullets.splice(i, 1);
+    // Вражеские снаряды (Яд и Гранаты)
+    for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+        let ep = enemyProjectiles[i];
+        if (ep.type === 'poison') {
+            ep.x += ep.vx; ep.y += ep.vy;
+            if (Math.hypot(ep.x - player.x, ep.y - player.y) < ep.radius + player.radius) {
+                takeDamage(10); enemyProjectiles.splice(i, 1); continue;
+            }
+            if (ep.x < 0 || ep.x > WORLD_WIDTH || ep.y < 0 || ep.y > WORLD_HEIGHT) enemyProjectiles.splice(i, 1);
+        } else if (ep.type === 'grenade') {
+            ep.timer--;
+            // Летит к цели
+            if (ep.timer > 30) {
+                ep.x += (ep.targetX - ep.startX) / 60;
+                ep.y += (ep.targetY - ep.startY) / 60;
+            }
+            // Взрыв
+            if (ep.timer <= 0) {
+                if (Math.hypot(ep.x - player.x, ep.y - player.y) < ep.blastRadius) takeDamage(25);
+                enemyProjectiles.splice(i, 1);
+            }
         }
     }
 
-    // 4. Движение зомби и урон игроку
+    // Движение зомби и боссов
     for (let z of zombies) {
         let angle = Math.atan2(player.y - z.y, player.x - z.x);
         z.x += Math.cos(angle) * z.speed;
         z.y += Math.sin(angle) * z.speed;
 
-        // Коллизия с игроком (нанесение периодического урона)
-        let dist = Math.hypot(player.x - z.x, player.y - z.y);
-        if (dist < player.radius + z.radius) {
-            player.hp -= 0.3; // Урон в секунду
-            if (player.hp <= 0) {
-                player.hp = 0;
-                endGame(false);
+        if (z.type === 'boss') {
+            z.timer++;
+            // Босс 2 плюется каждые 5 сек (300 кадров)
+            if (z.bossType === 'spitter' && z.timer >= 300) {
+                z.timer = 0;
+                let pAngle = Math.atan2(player.y - z.y, player.x - z.x);
+                enemyProjectiles.push({ type: 'poison', x: z.x, y: z.y, vx: Math.cos(pAngle) * 5, vy: Math.sin(pAngle) * 5, radius: 8 });
             }
+            // Бармаглот кидает гранаты каждые 4 сек (240 кадров)
+            if (z.bossType === 'barmaglot' && z.timer >= 240) {
+                z.timer = 0;
+                enemyProjectiles.push({
+                    type: 'grenade', startX: z.x, startY: z.y, x: z.x, y: z.y,
+                    targetX: player.x, targetY: player.y, timer: 90, blastRadius: 80
+                });
+            }
+        }
+
+        if (Math.hypot(player.x - z.x, player.y - z.y) < player.radius + z.radius) {
+            takeDamage(z.type === 'boss' ? 0.5 : 0.1); 
         }
     }
 
-    // 5. Проверка конца волны
-    if (zombies.length === 0 && isGameRunning) {
-        if (currentWave < MAX_WAVES) {
-            currentWave++;
+    // Предметы (Лут)
+    for (let i = items.length - 1; i >= 0; i--) {
+        let item = items[i];
+        if (Math.hypot(item.x - player.x, item.y - player.y) < player.radius + item.radius) {
+            if (item.type === 'machine_gun') {
+                player.weapon = 'machine_gun';
+                levelUp();
+            } else if (item.type === 'armor_boss') {
+                player.maxArmor = 100;
+                player.armor = 100;
+                levelUp();
+            } else if (item.type === 'armor_shard') {
+                player.armor = Math.min(player.maxArmor, player.armor + 10);
+            }
+            items.splice(i, 1);
+        }
+    }
+
+    // Конец волны (если не ждем подбора лута босса)
+    if (zombies.length === 0 && !items.some(i => i.type === 'machine_gun' || i.type === 'armor_boss')) {
+        if (waveIndex < waveBaseCounts.length) {
+            waveIndex++;
             spawnWave();
-        } else {
-            endGame(true);
         }
     }
 }
 
+function takeDamage(amount) {
+    if (player.armor > 0) {
+        player.armor -= amount;
+        if (player.armor < 0) {
+            player.hp += player.armor; // перенос остатка урона на HP
+            player.armor = 0;
+        }
+    } else {
+        player.hp -= amount;
+    }
+    if (player.hp <= 0) endGame(false);
+}
+
+function killZombie(index) {
+    let z = zombies[index];
+    
+    // Дроп с боссов
+    if (z.type === 'boss') {
+        if (currentLevel === 1) items.push({ type: 'machine_gun', x: z.x, y: z.y, radius: 25 });
+        if (currentLevel === 2) items.push({ type: 'armor_boss', x: z.x, y: z.y, radius: 25 });
+        if (currentLevel === 3) endGame(true); // Убили Бармаглота!
+    } else if (currentLevel === 3 && Math.random() < 0.1) {
+        // 10% шанс на кусок брони на 3 уровне
+        items.push({ type: 'armor_shard', x: z.x, y: z.y, radius: 10 });
+    }
+    
+    zombies.splice(index, 1);
+}
+
+function levelUp() {
+    currentLevel++;
+    waveIndex = 0;
+    spawnWave();
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let cameraX = Math.max(0, Math.min(player.x - canvas.width / 2, WORLD_WIDTH - canvas.width));
+    let cameraY = Math.max(0, Math.min(player.y - canvas.height / 2, WORLD_HEIGHT - canvas.height));
 
-    // Рассчитываем положение камеры, центрируя на игроке
-    let cameraX = player.x - canvas.width / 2;
-    let cameraY = player.y - canvas.height / 2;
-
-    // Ограничиваем камеру рамками мира
-    cameraX = Math.max(0, Math.min(cameraX, WORLD_WIDTH - canvas.width));
-    cameraY = Math.max(0, Math.min(cameraY, WORLD_HEIGHT - canvas.height));
-
-    // Отрисовка травы (фон)
+    // Фон и сетка
     ctx.fillStyle = '#2e5c1e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Сетка (для ощущения перемещения в пустом пространстве)
-    ctx.strokeStyle = '#254b17';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#254b17'; ctx.lineWidth = 1;
     const gridSize = 100;
-    const startX = Math.floor(cameraX / gridSize) * gridSize;
-    const startY = Math.floor(cameraY / gridSize) * gridSize;
-
-    for (let x = startX; x < cameraX + canvas.width; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x - cameraX, 0);
-        ctx.lineTo(x - cameraX, canvas.height);
-        ctx.stroke();
+    for (let x = Math.floor(cameraX/gridSize)*gridSize; x < cameraX+canvas.width; x+=gridSize) {
+        ctx.beginPath(); ctx.moveTo(x-cameraX, 0); ctx.lineTo(x-cameraX, canvas.height); ctx.stroke();
     }
-    for (let y = startY; y < cameraY + canvas.height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y - cameraY);
-        ctx.lineTo(canvas.width, y - cameraY);
-        ctx.stroke();
+    for (let y = Math.floor(cameraY/gridSize)*gridSize; y < cameraY+canvas.height; y+=gridSize) {
+        ctx.beginPath(); ctx.moveTo(0, y-cameraY); ctx.lineTo(canvas.width, y-cameraY); ctx.stroke();
     }
-
-    // Красная граница мира
-    ctx.strokeStyle = '#c0392b';
-    ctx.lineWidth = 8;
+    ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 8;
     ctx.strokeRect(-cameraX, -cameraY, WORLD_WIDTH, WORLD_HEIGHT);
 
-    // Отрисовка пуль
+    // Лут
+    for (let item of items) {
+        if (item.type === 'machine_gun') ctx.fillStyle = '#f1c40f'; // Золотой
+        else if (item.type === 'armor_boss') ctx.fillStyle = '#3498db'; // Синий
+        else if (item.type === 'armor_shard') ctx.fillStyle = '#85c1e9'; // Светло-синий
+        ctx.beginPath(); ctx.arc(item.x - cameraX, item.y - cameraY, item.radius, 0, Math.PI*2); ctx.fill();
+        if (item.type === 'machine_gun' || item.type === 'armor_boss') {
+            ctx.fillStyle = '#fff'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
+            ctx.fillText("ЛУТ!", item.x - cameraX, item.y - cameraY - 30);
+        }
+    }
+
+    // Вражеские снаряды
+    for (let ep of enemyProjectiles) {
+        if (ep.type === 'poison') {
+            ctx.fillStyle = '#2ecc71';
+            ctx.beginPath(); ctx.arc(ep.x - cameraX, ep.y - cameraY, ep.radius, 0, Math.PI*2); ctx.fill();
+        } else if (ep.type === 'grenade') {
+            // Рисуем зону поражения
+            ctx.fillStyle = (ep.timer % 10 < 5) ? 'rgba(231, 76, 60, 0.4)' : 'rgba(231, 76, 60, 0.1)';
+            ctx.beginPath(); ctx.arc(ep.targetX - cameraX, ep.targetY - cameraY, ep.blastRadius, 0, Math.PI*2); ctx.fill();
+            // Рисуем саму летящую гранату
+            ctx.fillStyle = '#e67e22';
+            ctx.beginPath(); ctx.arc(ep.x - cameraX, ep.y - cameraY, 8, 0, Math.PI*2); ctx.fill();
+        }
+    }
+
+    // Пули игрока
     ctx.fillStyle = '#f1c40f';
     for (let b of bullets) {
-        ctx.beginPath();
-        ctx.arc(b.x - cameraX, b.y - cameraY, b.radius, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(b.x - cameraX, b.y - cameraY, b.radius, 0, Math.PI*2); ctx.fill();
     }
 
-    // Отрисовка зомби
+    // Зомби
     for (let z of zombies) {
-        // Тело
-        ctx.fillStyle = '#27ae60';
-        ctx.beginPath();
-        ctx.arc(z.x - cameraX, z.y - cameraY, z.radius, 0, Math.PI * 2);
-        ctx.fill();
+        if (z.type === 'normal') ctx.fillStyle = '#27ae60';
+        else if (z.bossType === 'fatty') ctx.fillStyle = '#8e44ad'; // Фиолетовый
+        else if (z.bossType === 'spitter') ctx.fillStyle = '#1abc9c'; // Ядовитый
+        else if (z.bossType === 'barmaglot') ctx.fillStyle = '#c0392b'; // Красный Бармаглот
 
-        // Лицо (повернуто в сторону игрока)
+        ctx.beginPath(); ctx.arc(z.x - cameraX, z.y - cameraY, z.radius, 0, Math.PI*2); ctx.fill();
+
+        // Глаза
         let zAngle = Math.atan2(player.y - z.y, player.x - z.x);
-        ctx.save();
-        ctx.translate(z.x - cameraX, z.y - cameraY);
-        ctx.rotate(zAngle);
-        ctx.fillStyle = '#c0392b'; // Злые красные глаза
-        ctx.beginPath();
-        ctx.arc(5, -4, 2, 0, Math.PI * 2);
-        ctx.arc(5, 4, 2, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.save(); ctx.translate(z.x - cameraX, z.y - cameraY); ctx.rotate(zAngle);
+        ctx.fillStyle = '#000'; 
+        ctx.beginPath(); ctx.arc(z.radius/2, -z.radius/3, z.radius/6, 0, Math.PI*2);
+        ctx.arc(z.radius/2, z.radius/3, z.radius/6, 0, Math.PI*2); ctx.fill();
         ctx.restore();
 
-        // ХП-бар зомби (если ранен)
         if (z.hp < z.maxHp) {
-            const barW = 20;
-            const barH = 3;
-            ctx.fillStyle = '#7f8c8d';
-            ctx.fillRect(z.x - cameraX - barW/2, z.y - cameraY - z.radius - 6, barW, barH);
-            ctx.fillStyle = '#c0392b';
-            ctx.fillRect(z.x - cameraX - barW/2, z.y - cameraY - z.radius - 6, barW * (z.hp / z.maxHp), barH);
+            ctx.fillStyle = '#7f8c8d'; ctx.fillRect(z.x - cameraX - 15, z.y - cameraY - z.radius - 8, 30, 4);
+            ctx.fillStyle = '#e74c3c'; ctx.fillRect(z.x - cameraX - 15, z.y - cameraY - z.radius - 8, 30 * (z.hp/z.maxHp), 4);
         }
     }
 
-    // Отрисовка игрока
-    ctx.save();
-    ctx.translate(player.x - cameraX, player.y - cameraY);
-    
-    // Тело
-    ctx.fillStyle = '#3498db';
-    ctx.beginPath();
-    ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Направление оружия (на ближайшего врага)
-    let gunAngle = 0;
-    let target = null;
-    let minDist = Infinity;
-    for (let z of zombies) {
-        let dist = Math.hypot(z.x - player.x, z.y - player.y);
-        if (dist < minDist) {
-            minDist = dist;
-            target = z;
-        }
-    }
-    if (target) {
-        gunAngle = Math.atan2(target.y - player.y, target.x - player.x);
-    }
-    ctx.rotate(gunAngle);
-    ctx.fillStyle = '#34495e';
-    ctx.fillRect(8, -3, 14, 6); // Пистолет
+    // Игрок
+    ctx.save(); ctx.translate(player.x - cameraX, player.y - cameraY);
+    ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.arc(0, 0, player.radius, 0, Math.PI*2); ctx.fill();
+    let target = zombies.reduce((acc, curr) => Math.hypot(curr.x-player.x, curr.y-player.y) < Math.hypot(acc.x-player.x, acc.y-player.y) ? curr : acc, {x: Infinity, y: Infinity});
+    if (zombies.length > 0) ctx.rotate(Math.atan2(target.y - player.y, target.x - player.x));
+    ctx.fillStyle = '#34495e'; 
+    if (player.weapon === 'pistol') ctx.fillRect(8, -3, 14, 6);
+    else ctx.fillRect(8, -4, 22, 8); // Пулемет длиннее
     ctx.restore();
 
-    // ХП-бар игрока под ним
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(player.x - cameraX - 20, player.y - cameraY + player.radius + 8, 40, 6);
-    ctx.fillStyle = '#2ecc71';
-    ctx.fillRect(player.x - cameraX - 20, player.y - cameraY + player.radius + 8, 40 * (player.hp / player.maxHp), 6);
+    // Полоски здоровья и брони над игроком
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(player.x - cameraX - 20, player.y - cameraY + player.radius + 6, 40, 5);
+    ctx.fillStyle = '#2ecc71'; ctx.fillRect(player.x - cameraX - 20, player.y - cameraY + player.radius + 6, 40 * (player.hp/player.maxHp), 5);
+    
+    if (player.armor > 0) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(player.x - cameraX - 20, player.y - cameraY + player.radius + 12, 40, 4);
+        ctx.fillStyle = '#3498db'; ctx.fillRect(player.x - cameraX - 20, player.y - cameraY + player.radius + 12, 40 * (player.armor/player.maxArmor), 4);
+    }
 
-    // Интерфейс HUD (Сверху слева)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(15, 15, 260, 95);
-    ctx.strokeStyle = '#34495e';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(15, 15, 260, 95);
+    // HUD
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(15, 15, 270, 115);
+    ctx.strokeStyle = '#34495e'; ctx.lineWidth = 2; ctx.strokeRect(15, 15, 270, 115);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 14px "Courier New"'; ctx.textAlign = 'left';
+    ctx.fillText(`УРОВЕНЬ: ${currentLevel} / 3`, 25, 40);
+    ctx.fillText(waveIndex < 5 ? `ВОЛНА: ${waveIndex + 1} / 5` : `БОСС!`, 25, 60);
+    ctx.fillText(`ОРУЖИЕ: ${player.weapon === 'pistol' ? 'Пистолет' : 'ПУЛЕМЕТ'}`, 25, 80);
+    ctx.fillText(`HP: ${Math.max(0, Math.round(player.hp))} | БРОНЯ: ${Math.round(player.armor)}`, 25, 100);
 
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 14px "Courier New"';
-    ctx.fillText(`ВОЛНА: ${currentWave} / ${MAX_WAVES}`, 30, 40);
-    ctx.fillText(`ВРАГОВ ОСТАЛОСЬ: ${zombies.length}`, 30, 62);
-    ctx.fillText(`ЗДОРОВЬЕ: ${Math.max(0, Math.round(player.hp))}%`, 30, 84);
+    // Уведомление о луте
+    if (items.some(i => i.type === 'machine_gun' || i.type === 'armor_boss')) {
+        ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
+        ctx.fillText("ЗАБЕРИТЕ ЛУТ ДЛЯ ПЕРЕХОДА ДАЛЬШЕ!", canvas.width/2, 50);
+    }
 }
 
 function endGame(isVictory) {
     isGameRunning = false;
     overlay.classList.add('active');
     if (isVictory) {
-        overlayTitle.textContent = "ПОБЕДА!";
-        overlayTitle.style.color = "#2ecc71";
-        overlayDesc.textContent = "Ты выжил и зачистил все 5 волн зараженных!";
-        actionBtn.textContent = "Сыграть еще раз";
+        overlayTitle.textContent = "ПОБЕДА!"; overlayTitle.style.color = "#2ecc71";
+        overlayDesc.textContent = "Бармаглот повержен! Ты зачистил территорию.";
     } else {
-        overlayTitle.textContent = "ИГРА ОКОНЧЕНА";
-        overlayTitle.style.color = "#e74c3c";
-        overlayDesc.textContent = `Ты пал смертью храбрых на ${currentWave} волне.`;
-        actionBtn.textContent = "Попробовать снова";
+        overlayTitle.textContent = "СМЕРТЬ"; overlayTitle.style.color = "#e74c3c";
+        overlayDesc.textContent = `Ты погиб на ${currentLevel} уровне.`;
     }
+    actionBtn.textContent = "Сыграть еще раз";
 }
 
-// Поехали!
 gameLoop();
 </script>
 
