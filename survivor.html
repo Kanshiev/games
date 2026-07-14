@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 6.4 (TURBO x10 Mode)</title>
+    <title>Survivor.io - Alpha 6.5 (Pet Upgrades)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -59,7 +59,6 @@
 <body>
 
 <div id="gameWrapper">
-    <!-- ЛЕВАЯ ПАНЕЛЬ -->
     <div id="leftPanel" class="side-panel">
         <h2>СТАТУС</h2>
         <div class="stat-box">
@@ -102,7 +101,6 @@
         <button id="btnLoad" class="btn" style="background-color: #27ae60; padding: 8px;">Загрузить</button>
     </div>
 
-    <!-- ИГРОВОЕ ПОЛЕ -->
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="screenOverlay" class="overlay active">
@@ -112,14 +110,14 @@
         </div>
     </div>
 
-    <!-- ПРАВАЯ ПАНЕЛЬ -->
     <div id="rightPanel" class="side-panel">
         <h2>ПРОКАЧКА</h2>
         <div class="stat-box">
             <div class="stat-label">ЗОЛОТЫЕ МОНЕТЫ</div>
             <div class="stat-value" id="uiCoins" style="color: #f1c40f;">0</div>
         </div>
-        <button id="btnUpgradeLaser" class="btn btn-upgrade" style="margin-top: 0; margin-bottom: 20px;">Улучшить Лазер</button>
+        <button id="btnUpgradeLaser" class="btn btn-upgrade" style="margin-top: 0; margin-bottom: 10px;">Улучшить Лазер</button>
+        <button id="btnUpgradePet" class="btn btn-upgrade" style="margin-top: 0; margin-bottom: 20px;">Улучшить Питомца</button>
         
         <h2>ИНФО ОБ ИГРЕ</h2>
         <div class="stat-box">
@@ -172,6 +170,7 @@ const uiArmorBar = document.getElementById('uiArmorBar');
 // Правая панель
 const uiCoins = document.getElementById('uiCoins');
 const btnUpgradeLaser = document.getElementById('btnUpgradeLaser');
+const btnUpgradePet = document.getElementById('btnUpgradePet');
 const uiInfoCyber = document.getElementById('uiInfoCyber');
 const uiInfoZomb = document.getElementById('uiInfoZomb');
 const uiInfoGrenade = document.getElementById('uiInfoGrenade');
@@ -183,7 +182,7 @@ const WORLD_HEIGHT = 3000;
 const MAX_ACTIVE_ZOMBIES = 300; 
 
 let player = {};
-let pet = { active: false, x: 0, y: 0, angle: 0 };
+let pet = { active: false, x: 0, y: 0, angle: 0, level: 0 };
 let bullets = []; let zombies = []; let enemyProjectiles = []; let acidPools = []; let items = []; 
 let thrownGrenades = []; let explosions = []; 
 let keys = {};
@@ -211,8 +210,6 @@ actionBtn.addEventListener('click', () => initGame());
 document.getElementById('btnSave').addEventListener('click', saveGame);
 document.getElementById('btnLoad').addEventListener('click', loadGame);
 document.getElementById('btnPause').addEventListener('click', togglePause);
-
-// Кнопка ускорения игры (Сюда добавлен режим x10)
 document.getElementById('btnSpeed').addEventListener('click', () => {
     if (gameSpeed === 1) gameSpeed = 2;
     else if (gameSpeed === 2) gameSpeed = 3;
@@ -228,6 +225,20 @@ btnUpgradeLaser.addEventListener('click', () => {
         if (player.coins >= cost) {
             player.coins -= cost;
             player.laserLevel++;
+            updateUI();
+        }
+    }
+});
+
+btnUpgradePet.addEventListener('click', () => {
+    if (pet.active) {
+        if (pet.level === 0 && player.coins >= 1000) {
+            player.coins -= 1000;
+            pet.level = 1;
+            updateUI();
+        } else if (pet.level === 1 && player.coins >= 10000) {
+            player.coins -= 10000;
+            pet.level = 2;
             updateUI();
         }
     }
@@ -252,7 +263,8 @@ function loadGame() {
     const parsed = JSON.parse(data);
     
     player = parsed.player;
-    pet = parsed.pet || { active: false, x: 0, y: 0, angle: 0 };
+    pet = parsed.pet || { active: false, x: 0, y: 0, angle: 0, level: 0 };
+    if (pet.level === undefined) pet.level = 0; // На случай старых сохранений
     if (player.coins === undefined) player.coins = 0;
     if (player.laserLevel === undefined) player.laserLevel = 0;
     player.laserData = { active: false };
@@ -271,7 +283,7 @@ function initGame() {
         armor: 0, maxArmor: 100, grenades: 0, coins: 0, shootCooldown: 0, weapon: 'pistol', 
         hasSaws: false, sawAngle: 0, sawCount: 3, sawRadius: 60, laserLevel: 0, laserData: {active: false}
     };
-    pet = { active: false, x: player.x, y: player.y, angle: 0 };
+    pet = { active: false, x: player.x, y: player.y, angle: 0, level: 0 };
     bullets = []; zombies = []; enemyProjectiles = []; acidPools = []; items = []; thrownGrenades = []; explosions = [];
     keys = {}; currentLevel = 1; waveIndex = 0; zombiesRemainingToSpawn = 0; totalKills = 0;
     isGameRunning = true; isPaused = false;
@@ -429,7 +441,9 @@ function update() {
     }
     
     if (pet.active) {
+        let petMult = pet.level === 2 ? 5 : (pet.level === 1 ? 2 : 1);
         let targetItem = null; let minDist = 500;
+        
         for (let i of items) {
             if (i.type === 'coin' || i.type === 'player_grenade_pickup') {
                 let d = Math.hypot(i.x - player.x, i.y - player.y);
@@ -439,15 +453,16 @@ function update() {
         
         if (targetItem) {
             let pAngle = Math.atan2(targetItem.y - pet.y, targetItem.x - pet.x);
-            pet.x += Math.cos(pAngle) * player.speed * 1.5;
-            pet.y += Math.sin(pAngle) * player.speed * 1.5;
+            pet.x += Math.cos(pAngle) * player.speed * 1.5 * petMult;
+            pet.y += Math.sin(pAngle) * player.speed * 1.5 * petMult;
         } else {
-            pet.angle += 0.03;
+            pet.angle += 0.03 * petMult;
             let orbitX = player.x + Math.cos(pet.angle) * 80;
             let orbitY = player.y + Math.sin(pet.angle) * 80;
             let pAngle = Math.atan2(orbitY - pet.y, orbitX - pet.x);
             if (Math.hypot(orbitX - pet.x, orbitY - pet.y) > 5) {
-                pet.x += Math.cos(pAngle) * player.speed; pet.y += Math.sin(pAngle) * player.speed;
+                pet.x += Math.cos(pAngle) * player.speed * petMult;
+                pet.y += Math.sin(pAngle) * player.speed * petMult;
             }
         }
         
@@ -622,7 +637,7 @@ function update() {
             else if (item.type === 'saws') { player.hasSaws = true; levelUp(); }
             else if (item.type === 'plasma_cutter') { player.weapon = 'plasma_cutter'; levelUp(); }
             else if (item.type === 'laser_beam') { player.weapon = 'laser_beam'; levelUp(); }
-            else if (item.type === 'pet_unlock') { pet.active = true; pet.x = player.x; pet.y = player.y; levelUp(); }
+            else if (item.type === 'pet_unlock') { pet.active = true; pet.x = player.x; pet.y = player.y; pet.level = pet.level || 0; levelUp(); }
             else if (item.type === 'saw_upgrade') { player.sawCount = (player.sawCount || 3) + 1; player.sawRadius = (player.sawRadius || 60) + 10; levelUp(); }
             else if (item.type === 'generic_boss_loot') { levelUp(); }
             else if (item.type === 'armor_shard') player.armor = Math.min(player.maxArmor, player.armor + (player.maxArmor * 0.1));
@@ -711,6 +726,16 @@ function updateUI() {
         btnUpgradeLaser.style.opacity = player.coins >= cost ? '1' : '0.5';
     } else {
         btnUpgradeLaser.style.display = 'none';
+    }
+    
+    if (pet.active && pet.level < 2) {
+        btnUpgradePet.style.display = 'block';
+        let cost = pet.level === 0 ? 1000 : 10000;
+        let nextMult = pet.level === 0 ? 'x2' : 'x5';
+        btnUpgradePet.innerText = `Питомец ${nextMult} (${cost})`;
+        btnUpgradePet.style.opacity = player.coins >= cost ? '1' : '0.5';
+    } else {
+        btnUpgradePet.style.display = 'none';
     }
     
     let cyberChance = currentLevel >= 19 ? Math.min(100, (currentLevel - 18) * 5) : 0;
