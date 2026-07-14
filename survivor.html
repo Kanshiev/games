@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 5.0 (Delta Time & Speed Multiplier)</title>
+    <title>Survivor.io - Alpha 6.0 (Laser, Cyber-Zombies & Pet)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -20,7 +20,7 @@
         }
         #uiPanel {
             width: 250px; padding: 20px; background-color: #1a1a1a;
-            border-right: 4px solid #333; display: flex; flex-direction: column;
+            border-right: 4px solid #333; display: flex; flex-direction: column; overflow-y: auto; max-height: 600px;
         }
         #uiPanel h2 { margin-top: 0; color: #e74c3c; text-align: center; }
         .stat-box { background: #333; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
@@ -45,6 +45,8 @@
             cursor: pointer; transition: 0.2s; margin-top: 10px; width: 100%;
         }
         .btn:hover { background-color: #c0392b; transform: scale(1.05); }
+        .btn-upgrade { background-color: #f1c40f; color: #111; display: none; }
+        .btn-upgrade:hover { background-color: #f39c12; }
         
         .bar-bg { width: 100%; height: 15px; background: #555; border-radius: 3px; overflow: hidden; margin-top: 5px;}
         .hp-bar { height: 100%; background: #2ecc71; width: 100%; transition: width 0.2s; }
@@ -69,13 +71,15 @@
             </div>
         </div>
         <div class="stat-box">
-            <div class="stat-label">УБИТО ВРАГОВ</div>
-            <div class="stat-value" id="uiKills" style="color: #2ecc71;">0</div>
-        </div>
-        <div class="stat-box">
             <div class="stat-label">ОРУЖИЕ</div>
             <div class="stat-value" id="uiWeapon" style="color: #f1c40f;">Пистолет</div>
         </div>
+        <div class="stat-box">
+            <div class="stat-label">ЗОЛОТЫЕ МОНЕТЫ</div>
+            <div class="stat-value" id="uiCoins" style="color: #f1c40f;">0</div>
+        </div>
+        <button id="btnUpgradeLaser" class="btn btn-upgrade">Улучшить Лазер (15м)</button>
+        
         <div class="stat-box">
             <div class="stat-label">ГРАНАТЫ (R)</div>
             <div class="stat-value" id="uiGrenades" style="color: #e67e22;">0</div>
@@ -90,11 +94,10 @@
         </div>
         
         <div style="flex-grow: 1;"></div>
-        <div style="color: #888; font-size: 0.75rem; margin-bottom: 10px;">Движение: WASD<br>Гранаты: R<br>Пауза: P</div>
-        <button id="btnSpeed" class="btn" style="background-color: #8e44ad;">Скорость: x1</button>
-        <button id="btnPause" class="btn" style="background-color: #f39c12;">Пауза (P)</button>
-        <button id="btnSave" class="btn" style="background-color: #2980b9;">Сохранить игру</button>
-        <button id="btnLoad" class="btn" style="background-color: #27ae60;">Загрузить игру</button>
+        <div style="color: #888; font-size: 0.75rem; margin-bottom: 10px;">Гранаты: R | Пауза: P</div>
+        <button id="btnSpeed" class="btn" style="background-color: #8e44ad; padding: 8px;">Скорость: x1</button>
+        <button id="btnSave" class="btn" style="background-color: #2980b9; padding: 8px;">Сохранить игру</button>
+        <button id="btnLoad" class="btn" style="background-color: #27ae60; padding: 8px;">Загрузить игру</button>
     </div>
 
     <div id="gameContainer">
@@ -110,7 +113,6 @@
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-
 const overlay = document.getElementById('screenOverlay');
 const overlayTitle = document.getElementById('overlayTitle');
 const overlayDesc = document.getElementById('overlayDesc');
@@ -119,8 +121,9 @@ const actionBtn = document.getElementById('actionBtn');
 const uiLevel = document.getElementById('uiLevel');
 const uiWave = document.getElementById('uiWave');
 const uiWaveLeft = document.getElementById('uiWaveLeft');
-const uiKills = document.getElementById('uiKills');
 const uiWeapon = document.getElementById('uiWeapon');
+const uiCoins = document.getElementById('uiCoins');
+const btnUpgradeLaser = document.getElementById('btnUpgradeLaser');
 const uiGrenades = document.getElementById('uiGrenades');
 const uiHpText = document.getElementById('uiHpText');
 const uiHpBar = document.getElementById('uiHpBar');
@@ -129,15 +132,10 @@ const uiArmorBar = document.getElementById('uiArmorBar');
 
 const WORLD_WIDTH = 3000;
 const WORLD_HEIGHT = 3000;
-
-// Лимит мобов на экране
 const MAX_ACTIVE_ZOMBIES = 300; 
 
-let player = { 
-    x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, radius: 16, hp: 100, maxHp: 100, 
-    armor: 0, maxArmor: 100, weapon: 'pistol', grenades: 0, speed: 4, shootCooldown: 0, 
-    hasSaws: false, sawAngle: 0, sawCount: 3, sawRadius: 60
-};
+let player = {};
+let pet = { active: false, x: 0, y: 0, angle: 0 };
 let bullets = []; let zombies = []; let enemyProjectiles = []; let items = []; 
 let thrownGrenades = []; let explosions = []; 
 let keys = {};
@@ -164,27 +162,30 @@ window.addEventListener('keyup', e => {
 actionBtn.addEventListener('click', () => initGame());
 document.getElementById('btnSave').addEventListener('click', saveGame);
 document.getElementById('btnLoad').addEventListener('click', loadGame);
-document.getElementById('btnPause').addEventListener('click', togglePause);
-
-// Кнопка ускорения игры
 document.getElementById('btnSpeed').addEventListener('click', () => {
-    gameSpeed++;
-    if (gameSpeed > 4) gameSpeed = 1;
+    gameSpeed++; if (gameSpeed > 4) gameSpeed = 1;
     document.getElementById('btnSpeed').innerText = `Скорость: x${gameSpeed}`;
+});
+
+btnUpgradeLaser.addEventListener('click', () => {
+    if (player.weapon === 'laser_beam' && player.laserLevel < 10) {
+        let cost = (player.laserLevel + 1) * 15;
+        if (player.coins >= cost) {
+            player.coins -= cost;
+            player.laserLevel++;
+            updateUI();
+        }
+    }
 });
 
 function togglePause() {
     if (!isGameRunning || player.hp <= 0) return;
     isPaused = !isPaused;
-    document.getElementById('btnPause').innerText = isPaused ? "Продолжить (P)" : "Пауза (P)";
 }
 
 function saveGame() {
     if(!isGameRunning || player.hp <= 0) return alert("Невозможно сохранить сейчас.");
-    const saveData = {
-        player: { ...player, shootCooldown: 0 },
-        currentLevel, waveIndex, totalKills
-    };
+    const saveData = { player: { ...player, shootCooldown: 0 }, pet, currentLevel, waveIndex, totalKills };
     localStorage.setItem('survivorSave', JSON.stringify(saveData));
     alert("Игра сохранена!");
 }
@@ -195,33 +196,27 @@ function loadGame() {
     const parsed = JSON.parse(data);
     
     player = parsed.player;
-    if (player.grenades === undefined) player.grenades = 0; 
-    if (player.sawCount === undefined) player.sawCount = 3;
-    if (player.sawRadius === undefined) player.sawRadius = 60;
+    pet = parsed.pet || { active: false, x: 0, y: 0, angle: 0 };
+    if (player.coins === undefined) player.coins = 0;
+    if (player.laserLevel === undefined) player.laserLevel = 0;
     
-    currentLevel = parsed.currentLevel;
-    waveIndex = parsed.waveIndex;
-    totalKills = parsed.totalKills || 0;
-    
+    currentLevel = parsed.currentLevel; waveIndex = parsed.waveIndex; totalKills = parsed.totalKills || 0;
     bullets = []; zombies = []; enemyProjectiles = []; items = []; thrownGrenades = []; explosions = [];
     isGameRunning = true; isPaused = false;
-    document.getElementById('btnPause').innerText = "Пауза (P)";
     overlay.classList.remove('active');
-    
     spawnWave();
 }
 
 function initGame() {
     player = {
-        x: WORLD_WIDTH/2, y: WORLD_HEIGHT/2, radius: 16, speed: 4,
-        hp: 100, maxHp: 100, armor: 0, maxArmor: 100, grenades: 0,
-        shootCooldown: 0, weapon: 'pistol', hasSaws: false, sawAngle: 0,
-        sawCount: 3, sawRadius: 60
+        x: WORLD_WIDTH/2, y: WORLD_HEIGHT/2, radius: 16, speed: 4, hp: 100, maxHp: 100, 
+        armor: 0, maxArmor: 100, grenades: 0, coins: 0, shootCooldown: 0, weapon: 'pistol', 
+        hasSaws: false, sawAngle: 0, sawCount: 3, sawRadius: 60, laserLevel: 0
     };
+    pet = { active: false, x: player.x, y: player.y, angle: 0 };
     bullets = []; zombies = []; enemyProjectiles = []; items = []; thrownGrenades = []; explosions = [];
     keys = {}; currentLevel = 1; waveIndex = 0; zombiesRemainingToSpawn = 0; totalKills = 0;
     isGameRunning = true; isPaused = false;
-    document.getElementById('btnPause').innerText = "Пауза (P)";
     overlay.classList.remove('active');
     spawnWave();
 }
@@ -231,11 +226,11 @@ function getWeaponStats() {
     if (player.weapon === 'machine_gun') return { speed: 10, damage: 2, name: 'Пулемет', pierce: false };
     if (player.weapon === 'minigun') return { speed: 4, damage: 1.5, name: 'Миниган', pierce: false };
     if (player.weapon === 'plasma_cutter') return { speed: 8, damage: 3, name: 'Плазменный резак', pierce: true };
+    if (player.weapon === 'laser_beam') return { speed: 12, damage: 4 + (player.laserLevel * 2), name: `Широкий Лазер (Ур.${player.laserLevel})`, pierce: true, isLaser: true, radius: 30 + (player.laserLevel * 8) };
 }
 
 function throwPlayerGrenade() {
     if (!isGameRunning || isPaused || player.grenades <= 0) return;
-    
     let target = zombies.find(z => z.type === 'boss');
     if (!target) {
         let minDist = Infinity;
@@ -248,10 +243,8 @@ function throwPlayerGrenade() {
     
     player.grenades--;
     thrownGrenades.push({
-        x: player.x, y: player.y,
-        startX: player.x, startY: player.y,
-        targetX: target.x, targetY: target.y,
-        timer: 20 
+        x: player.x, y: player.y, startX: player.x, startY: player.y, targetX: target.x, targetY: target.y,
+        timer: 40, maxTimer: 40 // Таймер полета увеличен для красоты дуги
     });
 }
 
@@ -259,18 +252,11 @@ function spawnWave() {
     zombies = [];
     if (waveIndex < waveBaseCounts.length) {
         let multiplier = Math.pow(1.25, currentLevel - 1);
-        let totalWaveCount = Math.floor(waveBaseCounts[waveIndex] * multiplier);
-        
-        zombiesRemainingToSpawn = totalWaveCount;
-        
-        let startCount = Math.min(totalWaveCount, MAX_ACTIVE_ZOMBIES);
-        for (let i = 0; i < startCount; i++) {
-            spawnEnemy('normal');
-            zombiesRemainingToSpawn--;
-        }
+        zombiesRemainingToSpawn = Math.floor(waveBaseCounts[waveIndex] * multiplier);
+        let startCount = Math.min(zombiesRemainingToSpawn, MAX_ACTIVE_ZOMBIES);
+        for (let i = 0; i < startCount; i++) { spawnEnemy('normal'); zombiesRemainingToSpawn--; }
     } else {
-        zombiesRemainingToSpawn = 0;
-        spawnEnemy('boss');
+        zombiesRemainingToSpawn = 0; spawnEnemy('boss');
     }
 }
 
@@ -281,76 +267,60 @@ function spawnEnemy(type) {
     let zy = Math.max(50, Math.min(WORLD_HEIGHT - 50, player.y + Math.sin(angle) * distance));
 
     if (type === 'normal') {
-        zombies.push({
-            type: 'normal', x: zx, y: zy, radius: 14,
-            speed: 0.5 + Math.random() * 0.2, 
-            hp: 3 * (1 + (currentLevel-1)*0.2), 
-            maxHp: 3 * (1 + (currentLevel-1)*0.2)
-        });
+        let isCyber = false;
+        if (currentLevel >= 19) {
+            let cyberChance = (currentLevel - 18) * 0.05; // 5% на 19м, 10% на 20м и т.д.
+            if (Math.random() < cyberChance) isCyber = true;
+        }
+
+        let baseHp = 3 * (1 + (currentLevel-1)*0.2);
+        
+        if (isCyber) {
+            zombies.push({ type: 'cyber', x: zx, y: zy, radius: 16, speed: 0.5 + Math.random()*0.1, hp: baseHp * 5, maxHp: baseHp * 5 });
+        } else {
+            zombies.push({ type: 'normal', x: zx, y: zy, radius: 14, speed: 0.5 + Math.random()*0.2, hp: baseHp, maxHp: baseHp });
+        }
     } else if (type === 'boss') {
         let boss = { type: 'boss', x: zx, y: zy, timer: 0 };
         const bossConfigs = {
             1: {name: "ТОЛСТЯК", hp: 80, rad: 35, speed: 0.6},
             2: {name: "ПЛЕВАЛЬЩИК", hp: 250, rad: 35, speed: 0.7, bType: 'spitter'},
             3: {name: "БАРМАГЛОТ", hp: 800, rad: 45, speed: 0.8, bType: 'barmaglot'},
-            4: {name: "ТОКСИЧНЫЙ ТИМЛИД", hp: 1200, rad: 40, speed: 0.9},
-            5: {name: "КОУЧ УСПЕШНОГО УСПЕХА", hp: 1700, rad: 42, speed: 1.0},
-            6: {name: "ДЕД ИНСАЙД", hp: 2300, rad: 35, speed: 1.2},
-            7: {name: "КРОВАКРЫЛ", hp: 3500, rad: 30, speed: 1.8, bType: 'bloodwing'},
-            8: {name: "БАТЯ С РЕМНЕМ", hp: 5000, rad: 40, speed: 1.3},
-            9: {name: "САНТЕХНИК МИХАЛЫЧ", hp: 7000, rad: 45, speed: 0.8},
             10: {name: "МЕХА-СТРАЖ", hp: 10000, rad: 50, speed: 0.9, bType: 'mecha'},
-            11: {name: "БИЗНЕС-АНГЕЛ НА МЕРСЕ", hp: 13000, rad: 45, speed: 1.2},
-            12: {name: "ДУШНЫЙ КОЛЛЕГА", hp: 17000, rad: 40, speed: 0.9},
             13: {name: "КАРЕН ИЗ БУХГАЛТЕРИИ", hp: 22000, rad: 42, speed: 1.0},
-            14: {name: "ИНФОЦЫГАН НА САМОКАТЕ", hp: 28000, rad: 38, speed: 1.5},
-            15: {name: "ГЕНДИРЕКТОР ОАО 'МРАК'", hp: 35000, rad: 52, speed: 1.0}
+            16: {name: "СКРАМ-МАСТЕР", hp: 45000, rad: 45, speed: 1.1},
+            17: {name: "БОСС-ВЕРТОЛЕТ", hp: 55000, rad: 45, speed: 1.3},
+            18: {name: "КВАНТОВЫЙ ДУШНИЛА", hp: 70000, rad: 48, speed: 0.8}, // Дропает лазер
+            25: {name: "ПОВЕЛИТЕЛЬ ШЕРСТИ", hp: 150000, rad: 55, speed: 1.0} // Дропает пета
         };
 
-        let conf = bossConfigs[currentLevel] || {name: `СВЕРХМУТАНТ УР. ${currentLevel}`, hp: 35000 + (currentLevel - 15) * 5000, rad: 45, speed: 1.0};
+        let conf = bossConfigs[currentLevel] || {name: `СВЕРХМУТАНТ УР. ${currentLevel}`, hp: 35000 + (currentLevel - 15) * 8000, rad: 45, speed: 1.0};
         
         boss.name = conf.name; boss.radius = conf.rad; boss.speed = conf.speed; 
         boss.hp = conf.hp; boss.maxHp = conf.hp; boss.bossType = conf.bType || 'generic';
-        
         zombies.push(boss);
     }
 }
 
-// === НОВАЯ СИСТЕМА ФИКСИРОВАННОГО ВРЕМЕНИ (FIXED TIME STEP) ===
-let lastTime = performance.now();
-let accumulator = 0;
-const LOGIC_HZ = 165; // Базовая частота, к которой ты привык (165 тиков в секунду)
-const LOGIC_TICK = 1000 / LOGIC_HZ;
+// Fixed time step loop
+let lastTime = performance.now(); let accumulator = 0;
+const LOGIC_HZ = 165; const LOGIC_TICK = 1000 / LOGIC_HZ;
 
 function gameLoop(currentTime) {
     requestAnimationFrame(gameLoop);
-    
     if (!currentTime) currentTime = performance.now();
     let frameTime = currentTime - lastTime;
     lastTime = currentTime;
     
-    // Защита от огромных прыжков при сворачивании вкладки (Spiral of Death)
     if (frameTime > 250) frameTime = 250;
-    
-    // Умножаем прошедшее время на выбранную скорость игры (x1, x2, x3, x4)
     accumulator += frameTime * gameSpeed;
-    
     let updated = false;
     
-    // Обновляем логику столько раз, сколько накопилось тиков
     while (accumulator >= LOGIC_TICK) {
-        if (isGameRunning && !isPaused) {
-            update();
-        }
-        accumulator -= LOGIC_TICK;
-        updated = true;
+        if (isGameRunning && !isPaused) update();
+        accumulator -= LOGIC_TICK; updated = true;
     }
-    
-    // Отрисовываем кадр, если логика продвинулась или игра на паузе (чтобы нарисовать меню)
-    if (updated || isPaused) {
-        draw(); 
-        updateUI();
-    }
+    if (updated || isPaused) { draw(); updateUI(); }
 }
 
 function update() {
@@ -366,41 +336,79 @@ function update() {
 
     if (zombiesRemainingToSpawn > 0 && zombies.length < MAX_ACTIVE_ZOMBIES) {
         let spawnCount = Math.min(MAX_ACTIVE_ZOMBIES - zombies.length, zombiesRemainingToSpawn);
-        for (let i = 0; i < spawnCount; i++) {
-            spawnEnemy('normal');
-            zombiesRemainingToSpawn--;
-        }
+        for (let i = 0; i < spawnCount; i++) { spawnEnemy('normal'); zombiesRemainingToSpawn--; }
     }
 
+    // Пилы
     if (player.hasSaws) {
         player.sawAngle += 0.05;
         const orbitRadius = player.sawRadius || 60;
         for (let z of zombies) {
             if (Math.hypot(player.x - z.x, player.y - z.y) <= (orbitRadius + 20)) {
-                z.hp -= 0.5; 
-                if (z.hp <= 0 && !z.deadMark) z.deadMark = true; 
+                z.hp -= 0.5; if (z.hp <= 0 && !z.deadMark) z.deadMark = true; 
+            }
+        }
+    }
+    
+    // Питомец
+    if (pet.active) {
+        let targetItem = null; let minDist = 500;
+        for (let i of items) {
+            if (i.type === 'coin' || i.type === 'player_grenade_pickup') {
+                let d = Math.hypot(i.x - player.x, i.y - player.y);
+                if (d < minDist) { minDist = d; targetItem = i; }
+            }
+        }
+        
+        if (targetItem) {
+            let pAngle = Math.atan2(targetItem.y - pet.y, targetItem.x - pet.x);
+            pet.x += Math.cos(pAngle) * player.speed * 1.5; // Питомец быстрый
+            pet.y += Math.sin(pAngle) * player.speed * 1.5;
+        } else {
+            // Орбита вокруг игрока
+            pet.angle += 0.03;
+            let orbitX = player.x + Math.cos(pet.angle) * 80;
+            let orbitY = player.y + Math.sin(pet.angle) * 80;
+            let pAngle = Math.atan2(orbitY - pet.y, orbitX - pet.x);
+            if (Math.hypot(orbitX - pet.x, orbitY - pet.y) > 5) {
+                pet.x += Math.cos(pAngle) * player.speed; pet.y += Math.sin(pAngle) * player.speed;
+            }
+        }
+        
+        // Сбор лута питомцем
+        for (let i = items.length - 1; i >= 0; i--) {
+            let item = items[i];
+            if ((item.type === 'coin' || item.type === 'player_grenade_pickup') && Math.hypot(item.x - pet.x, item.y - pet.y) < 25) {
+                if (item.type === 'coin') player.coins++;
+                if (item.type === 'player_grenade_pickup') player.grenades++;
+                items.splice(i, 1);
             }
         }
     }
 
-    let nearestZombie = null, minDist = Infinity;
+    let nearestZombie = null, minDistZ = Infinity;
     for (let z of zombies) {
         let dist = Math.hypot(z.x - player.x, z.y - player.y);
-        if (dist < minDist) { minDist = dist; nearestZombie = z; }
+        if (dist < minDistZ) { minDistZ = dist; nearestZombie = z; }
     }
 
     if (player.shootCooldown > 0) player.shootCooldown--;
     if (player.shootCooldown === 0 && nearestZombie) {
         let stats = getWeaponStats();
         const angle = Math.atan2(nearestZombie.y - player.y, nearestZombie.x - player.x);
-        bullets.push({ 
-            x: player.x, y: player.y, 
-            vx: Math.cos(angle) * 12, vy: Math.sin(angle) * 12, 
-            radius: player.weapon === 'plasma_cutter' ? 8 : 4, 
-            dmg: stats.damage, 
-            pierce: stats.pierce,
-            hitEnemies: [] 
-        });
+        
+        if (stats.isLaser) {
+            // Широкая лазерная волна (двигается быстро, накрывает большую площадь)
+            bullets.push({ 
+                x: player.x, y: player.y, vx: Math.cos(angle) * 15, vy: Math.sin(angle) * 15, 
+                radius: stats.radius, dmg: stats.damage, pierce: true, hitEnemies: [], isLaserLine: true, angle: angle
+            });
+        } else {
+            bullets.push({ 
+                x: player.x, y: player.y, vx: Math.cos(angle) * 12, vy: Math.sin(angle) * 12, 
+                radius: player.weapon === 'plasma_cutter' ? 8 : 4, dmg: stats.damage, pierce: stats.pierce, hitEnemies: [] 
+            });
+        }
         player.shootCooldown = stats.speed;
     }
 
@@ -417,29 +425,25 @@ function update() {
             if (Math.hypot(b.x - z.x, b.y - z.y) < b.radius + z.radius) {
                 z.hp -= b.dmg; 
                 if (z.hp <= 0) z.deadMark = true;
-                
-                if (b.pierce) {
-                    b.hitEnemies.push(z);
-                } else {
-                    hit = true;
-                    break;
-                }
+                if (b.pierce) { b.hitEnemies.push(z); } else { hit = true; break; }
             }
         }
         if (hit) bullets.splice(i, 1);
     }
 
+    // Физика гранат (анимация дуги)
     for (let i = thrownGrenades.length - 1; i >= 0; i--) {
         let g = thrownGrenades[i];
         g.timer--;
         if (g.timer > 0) {
-            g.x += (g.targetX - g.startX) / 20;
-            g.y += (g.targetY - g.startY) / 20;
+            g.x += (g.targetX - g.startX) / g.maxTimer;
+            g.y += (g.targetY - g.startY) / g.maxTimer;
+            // Высота полета по дуге (синус)
+            g.z = Math.sin((g.timer / g.maxTimer) * Math.PI) * 100;
         } else {
             for (let z of zombies) {
                 if (Math.hypot(z.x - g.x, z.y - g.y) <= 100) {
-                    if (z.type === 'boss') z.hp -= (z.maxHp * 0.10); 
-                    else z.hp -= 200; 
+                    if (z.type === 'boss') z.hp -= (z.maxHp * 0.10); else z.hp -= 300; 
                     if (z.hp <= 0 && !z.deadMark) z.deadMark = true;
                 }
             }
@@ -453,6 +457,7 @@ function update() {
         if (explosions[i].life <= 0) explosions.splice(i, 1);
     }
 
+    // Физика толпы
     for (let i = 0; i < zombies.length; i++) {
         for (let j = i + 1; j < zombies.length; j++) {
             let z1 = zombies[i], z2 = zombies[j];
@@ -471,15 +476,11 @@ function update() {
         let ep = enemyProjectiles[i];
         if (ep.type === 'poison') {
             ep.x += ep.vx; ep.y += ep.vy;
-            if (Math.hypot(ep.x - player.x, ep.y - player.y) < ep.radius + player.radius) {
-                takeDamage(10); enemyProjectiles.splice(i, 1); continue;
-            }
+            if (Math.hypot(ep.x - player.x, ep.y - player.y) < ep.radius + player.radius) { takeDamage(10); enemyProjectiles.splice(i, 1); continue; }
             if (ep.x < 0 || ep.x > WORLD_WIDTH || ep.y < 0 || ep.y > WORLD_HEIGHT) enemyProjectiles.splice(i, 1);
         } else if (ep.type === 'grenade') {
             ep.timer--;
-            if (ep.timer > 30) {
-                ep.x += (ep.targetX - ep.startX) / 60; ep.y += (ep.targetY - ep.startY) / 60;
-            }
+            if (ep.timer > 30) { ep.x += (ep.targetX - ep.startX) / 60; ep.y += (ep.targetY - ep.startY) / 60; }
             if (ep.timer <= 0) {
                 if (Math.hypot(ep.x - player.x, ep.y - player.y) < ep.blastRadius) takeDamage(25);
                 enemyProjectiles.splice(i, 1);
@@ -489,15 +490,10 @@ function update() {
 
     for (let i = zombies.length - 1; i >= 0; i--) {
         let z = zombies[i];
-        if (z.deadMark) {
-            killZombie(z);
-            zombies.splice(i, 1);
-            continue;
-        }
+        if (z.deadMark) { killZombie(z); zombies.splice(i, 1); continue; }
 
         let angle = Math.atan2(player.y - z.y, player.x - z.x);
-        z.x += Math.cos(angle) * z.speed;
-        z.y += Math.sin(angle) * z.speed;
+        z.x += Math.cos(angle) * z.speed; z.y += Math.sin(angle) * z.speed;
 
         if (z.type === 'boss') {
             z.timer++;
@@ -507,15 +503,10 @@ function update() {
             }
             if (z.bossType === 'barmaglot' && z.timer >= 240) {
                 z.timer = 0;
-                enemyProjectiles.push({
-                    type: 'grenade', startX: z.x, startY: z.y, x: z.x, y: z.y,
-                    targetX: player.x, targetY: player.y, timer: 90, blastRadius: 80
-                });
+                enemyProjectiles.push({ grenade: true, startX: z.x, startY: z.y, x: z.x, y: z.y, targetX: player.x, targetY: player.y, timer: 90, blastRadius: 80 });
             }
         }
-        if (Math.hypot(player.x - z.x, player.y - z.y) < player.radius + z.radius) {
-            takeDamage(z.type === 'boss' ? 0.5 : 0.1); 
-        }
+        if (Math.hypot(player.x - z.x, player.y - z.y) < player.radius + z.radius) { takeDamage(z.type === 'boss' ? 0.5 : 0.1); }
     }
 
     for (let i = items.length - 1; i >= 0; i--) {
@@ -526,27 +517,22 @@ function update() {
             else if (item.type === 'minigun') { player.weapon = 'minigun'; levelUp(); }
             else if (item.type === 'saws') { player.hasSaws = true; levelUp(); }
             else if (item.type === 'plasma_cutter') { player.weapon = 'plasma_cutter'; levelUp(); }
-            else if (item.type === 'saw_upgrade') {
-                player.sawCount = (player.sawCount || 3) + 1;
-                player.sawRadius = (player.sawRadius || 60) + 10;
-                levelUp();
-            }
+            else if (item.type === 'laser_beam') { player.weapon = 'laser_beam'; levelUp(); }
+            else if (item.type === 'pet_unlock') { pet.active = true; pet.x = player.x; pet.y = player.y; levelUp(); }
+            else if (item.type === 'saw_upgrade') { player.sawCount = (player.sawCount || 3) + 1; player.sawRadius = (player.sawRadius || 60) + 10; levelUp(); }
             else if (item.type === 'generic_boss_loot') { levelUp(); }
             else if (item.type === 'armor_shard') player.armor = Math.min(player.maxArmor, player.armor + (player.maxArmor * 0.1));
             else if (item.type === 'medkit') player.hp = Math.min(player.maxHp, player.hp + (player.maxHp * 0.05));
             else if (item.type === 'player_grenade_pickup') player.grenades++;
+            else if (item.type === 'coin') player.coins++;
             
             items.splice(i, 1);
         }
     }
 
-    const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'saw_upgrade', 'generic_boss_loot'];
+    const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'laser_beam', 'pet_unlock', 'saw_upgrade', 'generic_boss_loot'];
     if (zombies.length === 0 && zombiesRemainingToSpawn === 0 && !items.some(i => bossLootTypes.includes(i.type))) {
-        if (waveIndex < waveBaseCounts.length) {
-            waveIndex++; spawnWave();
-        } else if (currentLevel === 3) {
-            levelUp(); 
-        }
+        if (waveIndex < waveBaseCounts.length) { waveIndex++; spawnWave(); } else if (currentLevel === 3) { levelUp(); }
     }
 }
 
@@ -567,8 +553,12 @@ function killZombie(z) {
         else if (currentLevel === 7) items.push({ type: 'minigun', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel === 10) items.push({ type: 'saws', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel === 13) items.push({ type: 'plasma_cutter', x: z.x, y: z.y, radius: 25 });
-        else if (currentLevel > 10) items.push({ type: 'saw_upgrade', x: z.x, y: z.y, radius: 25 });
+        else if (currentLevel === 18) items.push({ type: 'laser_beam', x: z.x, y: z.y, radius: 25 });
+        else if (currentLevel === 25) items.push({ type: 'pet_unlock', x: z.x, y: z.y, radius: 25 });
+        else if (currentLevel > 10 && currentLevel !== 18 && currentLevel !== 25) items.push({ type: 'saw_upgrade', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel !== 3) items.push({ type: 'generic_boss_loot', x: z.x, y: z.y, radius: 25 });
+    } else if (z.type === 'cyber') {
+        if (Math.random() < 0.30) items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); // 30% дроп монет
     } else {
         if (Math.random() < 0.02) items.push({ type: 'player_grenade_pickup', x: z.x, y: z.y, radius: 10 }); 
         if (currentLevel >= 3 && Math.random() < 0.1) items.push({ type: 'armor_shard', x: z.x, y: z.y, radius: 10 });
@@ -576,34 +566,38 @@ function killZombie(z) {
     }
 }
 
-function levelUp() {
-    currentLevel++; waveIndex = 0; spawnWave();
-}
+function levelUp() { currentLevel++; waveIndex = 0; spawnWave(); }
 
 function updateUI() {
     if(!isGameRunning) return;
     uiLevel.innerText = currentLevel;
-    uiKills.innerText = totalKills;
     
     if (waveIndex < waveBaseCounts.length) {
         uiWave.innerText = `${waveIndex + 1} / 5`;
-        let totalRemaining = zombies.length + zombiesRemainingToSpawn;
-        uiWaveLeft.innerText = `(Осталось: ${totalRemaining})`;
+        uiWaveLeft.innerText = `(Осталось: ${zombies.length + zombiesRemainingToSpawn})`;
     } else {
-        uiWave.innerText = 'БОСС';
-        uiWaveLeft.innerText = '';
+        uiWave.innerText = 'БОСС'; uiWaveLeft.innerText = '';
     }
     
     uiWeapon.innerText = getWeaponStats().name;
     uiGrenades.innerText = player.grenades;
+    uiCoins.innerText = player.coins;
+    
+    // Кнопка апгрейда лазера
+    if (player.weapon === 'laser_beam' && player.laserLevel < 10) {
+        btnUpgradeLaser.style.display = 'block';
+        let cost = (player.laserLevel + 1) * 15;
+        btnUpgradeLaser.innerText = `Улучшить Лазер (${cost} м)`;
+        btnUpgradeLaser.style.opacity = player.coins >= cost ? '1' : '0.5';
+    } else {
+        btnUpgradeLaser.style.display = 'none';
+    }
     
     let hpPerc = Math.max(0, (player.hp / player.maxHp) * 100);
-    uiHpText.innerText = Math.round(player.hp);
-    uiHpBar.style.width = hpPerc + '%';
+    uiHpText.innerText = Math.round(player.hp); uiHpBar.style.width = hpPerc + '%';
     
     let armPerc = Math.max(0, (player.armor / player.maxArmor) * 100);
-    uiArmorText.innerText = Math.round(player.armor);
-    uiArmorBar.style.width = armPerc + '%';
+    uiArmorText.innerText = Math.round(player.armor); uiArmorBar.style.width = armPerc + '%';
 }
 
 function draw() {
@@ -622,6 +616,7 @@ function draw() {
     ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 8;
     ctx.strokeRect(-cameraX, -cameraY, WORLD_WIDTH, WORLD_HEIGHT);
 
+    // Лут
     for (let item of items) {
         ctx.save(); ctx.translate(item.x - cameraX, item.y - cameraY);
         if (item.type === 'machine_gun') { ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); } 
@@ -629,9 +624,15 @@ function draw() {
         else if (item.type === 'minigun') { ctx.fillStyle = '#e67e22'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'saws') { ctx.fillStyle = '#9b59b6'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'plasma_cutter') { ctx.fillStyle = '#00ffff'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
+        else if (item.type === 'laser_beam') { ctx.fillStyle = '#ff00ff'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
+        else if (item.type === 'pet_unlock') { ctx.fillStyle = '#e67e22'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'saw_upgrade') { ctx.fillStyle = '#ff4757'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'generic_boss_loot') { ctx.fillStyle = '#bdc3c7'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'armor_shard') { ctx.fillStyle = '#85c1e9'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
+        else if (item.type === 'coin') {
+            ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#d4ac0d'; ctx.beginPath(); ctx.arc(0, 0, item.radius*0.6, 0, Math.PI*2); ctx.stroke();
+        }
         else if (item.type === 'medkit') {
             ctx.fillStyle = '#fff'; ctx.fillRect(-8, -8, 16, 16);
             ctx.fillStyle = '#e74c3c'; ctx.fillRect(-2, -6, 4, 12); ctx.fillRect(-6, -2, 12, 4);
@@ -642,27 +643,33 @@ function draw() {
         }
         ctx.restore();
         
-        const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'saw_upgrade', 'generic_boss_loot'];
+        const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'laser_beam', 'pet_unlock', 'saw_upgrade', 'generic_boss_loot'];
         if (bossLootTypes.includes(item.type)) {
             ctx.fillStyle = '#fff'; ctx.font = '14px Arial'; ctx.textAlign = 'center';
-            if (item.type === 'saw_upgrade') {
-                ctx.fillText("+1 К СТРАЖУ!", item.x - cameraX, item.y - cameraY - 30);
-            } else if (item.type === 'plasma_cutter') {
-                ctx.fillText("РЕЗАК!", item.x - cameraX, item.y - cameraY - 30);
-            } else {
-                ctx.fillText("ЛУТ!", item.x - cameraX, item.y - cameraY - 30);
-            }
+            if (item.type === 'saw_upgrade') ctx.fillText("+1 К СТРАЖУ!", item.x - cameraX, item.y - cameraY - 30);
+            else if (item.type === 'pet_unlock') ctx.fillText("ПИТОМЕЦ!", item.x - cameraX, item.y - cameraY - 30);
+            else if (item.type === 'laser_beam') ctx.fillText("ЛАЗЕР!", item.x - cameraX, item.y - cameraY - 30);
+            else ctx.fillText("ЛУТ!", item.x - cameraX, item.y - cameraY - 30);
         }
     }
 
+    // Взрывы гранат
     for(let ex of explosions) {
         ctx.fillStyle = `rgba(230, 126, 34, ${ex.life/10})`;
         ctx.beginPath(); ctx.arc(ex.x - cameraX, ex.y - cameraY, ex.radius, 0, Math.PI*2); ctx.fill();
     }
 
+    // Траектория полета гранаты
     for(let g of thrownGrenades) {
-        ctx.fillStyle = '#000';
+        // Тень (на земле)
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath(); ctx.arc(g.x - cameraX, g.y - cameraY, 6, 0, Math.PI*2); ctx.fill();
+        // Сама граната (с учетом высоты z)
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(g.x - cameraX, g.y - cameraY - (g.z || 0), 8, 0, Math.PI*2); ctx.fill();
+        // Чека (красненькая)
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(g.x - cameraX - 2, g.y - cameraY - (g.z || 0) - 8, 4, 4);
     }
 
     for (let ep of enemyProjectiles) {
@@ -675,10 +682,21 @@ function draw() {
         }
     }
 
+    // Пули / Лазер
     for (let b of bullets) {
-        if (player.weapon === 'plasma_cutter') {
-            ctx.fillStyle = '#00ffff'; 
-            ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 10;
+        if (b.isLaserLine) {
+            // Рисуем широкую лазерную волну перпендикулярно направлению полета
+            ctx.save();
+            ctx.translate(b.x - cameraX, b.y - cameraY);
+            ctx.rotate(b.angle);
+            ctx.fillStyle = '#ff00ff'; ctx.shadowColor = '#ff00ff'; ctx.shadowBlur = 15;
+            // Рисуем волну (полумесяц/широкую линию)
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 10, b.radius, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        } else if (player.weapon === 'plasma_cutter') {
+            ctx.fillStyle = '#00ffff'; ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 10;
             ctx.beginPath(); ctx.arc(b.x - cameraX, b.y - cameraY, b.radius, 0, Math.PI*2); ctx.fill();
             ctx.shadowBlur = 0; 
         } else {
@@ -687,8 +705,22 @@ function draw() {
         }
     }
 
+    // Питомeц
+    if (pet.active) {
+        ctx.save(); ctx.translate(pet.x - cameraX, pet.y - cameraY);
+        // Тельце
+        ctx.fillStyle = '#d35400'; ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI*2); ctx.fill();
+        // Ушки
+        ctx.rotate(pet.angle * 2);
+        ctx.beginPath(); ctx.moveTo(-8, -5); ctx.lineTo(-12, -15); ctx.lineTo(-2, -10); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(8, -5); ctx.lineTo(12, -15); ctx.lineTo(2, -10); ctx.fill();
+        ctx.restore();
+    }
+
+    // Зомби
     for (let z of zombies) {
         if (z.type === 'normal') ctx.fillStyle = '#27ae60';
+        else if (z.type === 'cyber') ctx.fillStyle = '#7f8c8d'; // Бронированные киберзомби
         else if (z.bossType === 'fatty') ctx.fillStyle = '#8e44ad'; 
         else if (z.bossType === 'spitter') ctx.fillStyle = '#1abc9c'; 
         else if (z.bossType === 'barmaglot') ctx.fillStyle = '#c0392b'; 
@@ -700,7 +732,9 @@ function draw() {
 
         let zAngle = Math.atan2(player.y - z.y, player.x - z.x);
         ctx.save(); ctx.translate(z.x - cameraX, z.y - cameraY); ctx.rotate(zAngle);
-        ctx.fillStyle = '#000'; 
+        
+        // Глаза (кибер - синие, остальные - черные)
+        ctx.fillStyle = z.type === 'cyber' ? '#00ffff' : '#000'; 
         ctx.beginPath(); ctx.arc(z.radius/2, -z.radius/3, z.radius/6, 0, Math.PI*2);
         ctx.arc(z.radius/2, z.radius/3, z.radius/6, 0, Math.PI*2); ctx.fill();
         ctx.restore();
@@ -708,7 +742,6 @@ function draw() {
         if (z.type === 'boss') {
             ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
             ctx.fillText(z.name, z.x - cameraX, z.y - cameraY - z.radius - 12);
-            
             const bWidth = 60;
             ctx.fillStyle = '#7f8c8d'; ctx.fillRect(z.x - cameraX - bWidth/2, z.y - cameraY - z.radius - 8, bWidth, 5);
             ctx.fillStyle = '#e74c3c'; ctx.fillRect(z.x - cameraX - bWidth/2, z.y - cameraY - z.radius - 8, bWidth * (z.hp/z.maxHp), 5);
@@ -718,6 +751,7 @@ function draw() {
         }
     }
 
+    // Игрок
     ctx.save(); ctx.translate(player.x - cameraX, player.y - cameraY);
     ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.arc(0, 0, player.radius, 0, Math.PI*2); ctx.fill();
     let target = zombies.reduce((acc, curr) => Math.hypot(curr.x-player.x, curr.y-player.y) < Math.hypot(acc.x-player.x, acc.y-player.y) ? curr : acc, {x: Infinity, y: Infinity});
@@ -726,12 +760,9 @@ function draw() {
     ctx.fillStyle = '#34495e'; 
     if (player.weapon === 'pistol') ctx.fillRect(8, -3, 14, 6);
     else if (player.weapon === 'machine_gun') ctx.fillRect(8, -4, 22, 8);
-    else if (player.weapon === 'minigun') {
-        ctx.fillRect(8, -5, 26, 10); ctx.fillStyle = '#e67e22'; ctx.fillRect(20, -6, 16, 12); 
-    } else if (player.weapon === 'plasma_cutter') {
-        ctx.fillStyle = '#8e44ad'; ctx.fillRect(8, -4, 28, 8); 
-        ctx.fillStyle = '#00ffff'; ctx.fillRect(14, -2, 22, 4); 
-    }
+    else if (player.weapon === 'minigun') { ctx.fillRect(8, -5, 26, 10); ctx.fillStyle = '#e67e22'; ctx.fillRect(20, -6, 16, 12); } 
+    else if (player.weapon === 'plasma_cutter') { ctx.fillStyle = '#8e44ad'; ctx.fillRect(8, -4, 28, 8); ctx.fillStyle = '#00ffff'; ctx.fillRect(14, -2, 22, 4); }
+    else if (player.weapon === 'laser_beam') { ctx.fillStyle = '#fff'; ctx.fillRect(8, -4, 30, 8); ctx.fillStyle = '#ff00ff'; ctx.fillRect(10, -2, 26, 4); }
     ctx.restore();
 
     if (player.hasSaws) {
@@ -748,12 +779,6 @@ function draw() {
             for(let j=0; j<4; j++) { ctx.rotate(Math.PI/2); ctx.beginPath(); ctx.moveTo(0,-5); ctx.lineTo(12,0); ctx.lineTo(0,5); ctx.fill(); }
             ctx.restore();
         }
-    }
-    
-    const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'saw_upgrade', 'generic_boss_loot'];
-    if (items.some(i => bossLootTypes.includes(i.type))) {
-        ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
-        ctx.fillText("ПОДБЕРИТЕ УЛУЧШЕНИЕ ДЛЯ СЛЕДУЮЩЕГО УРОВНЯ!", canvas.width/2, 50);
     }
     
     if (isPaused) {
