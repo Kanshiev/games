@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 6.1 (Balance & Static Laser)</title>
+    <title>Survivor.io - Alpha 6.2 (Dual UI Panels & Info)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -18,15 +18,18 @@
             border: 4px solid #333; border-radius: 8px;
             background-color: #222;
         }
-        #uiPanel {
-            width: 250px; padding: 20px; background-color: #1a1a1a;
-            border-right: 4px solid #333; display: flex; flex-direction: column; overflow-y: auto; max-height: 600px;
+        .side-panel {
+            width: 230px; padding: 20px; background-color: #1a1a1a;
+            display: flex; flex-direction: column; overflow-y: auto; max-height: 600px;
         }
-        #uiPanel h2 { margin-top: 0; color: #e74c3c; text-align: center; }
+        #leftPanel { border-right: 4px solid #333; }
+        #rightPanel { border-left: 4px solid #333; }
+        
+        .side-panel h2 { margin-top: 0; color: #e74c3c; text-align: center; font-size: 1.3rem; }
         .stat-box { background: #333; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
-        .stat-label { font-size: 0.9rem; color: #aaa; margin-bottom: 5px; }
-        .stat-value { font-size: 1.2rem; font-weight: bold; }
-        .stat-subtext { font-size: 0.8rem; color: #e74c3c; font-weight: normal; margin-left: 5px; }
+        .stat-label { font-size: 0.85rem; color: #aaa; margin-bottom: 5px; }
+        .stat-value { font-size: 1.1rem; font-weight: bold; }
+        .stat-subtext { font-size: 0.75rem; color: #e74c3c; font-weight: normal; margin-left: 5px; }
         
         #gameContainer { position: relative; background-color: #2e5c1e; }
         canvas { display: block; }
@@ -39,13 +42,13 @@
         .overlay.active { display: flex; }
         .overlay h1 { font-size: 3rem; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 3px; }
         .btn {
-            padding: 10px 20px; font-size: 1rem; font-weight: bold;
+            padding: 10px 15px; font-size: 0.9rem; font-weight: bold;
             text-transform: uppercase; background-color: #e74c3c;
             color: white; border: none; border-radius: 4px;
             cursor: pointer; transition: 0.2s; margin-top: 10px; width: 100%;
         }
         .btn:hover { background-color: #c0392b; transform: scale(1.05); }
-        .btn-upgrade { background-color: #f1c40f; color: #111; display: none; font-size: 0.9rem; }
+        .btn-upgrade { background-color: #f1c40f; color: #111; display: none; }
         .btn-upgrade:hover { background-color: #f39c12; }
         
         .bar-bg { width: 100%; height: 15px; background: #555; border-radius: 3px; overflow: hidden; margin-top: 5px;}
@@ -56,9 +59,9 @@
 <body>
 
 <div id="gameWrapper">
-    <div id="uiPanel">
+    <!-- ЛЕВАЯ ПАНЕЛЬ -->
+    <div id="leftPanel" class="side-panel">
         <h2>СТАТУС</h2>
-        
         <div class="stat-box">
             <div class="stat-label">УРОВЕНЬ</div>
             <div class="stat-value" id="uiLevel">1</div>
@@ -71,15 +74,13 @@
             </div>
         </div>
         <div class="stat-box">
+            <div class="stat-label">УБИТО ЗОМБИ</div>
+            <div class="stat-value" id="uiKills" style="color: #2ecc71;">0</div>
+        </div>
+        <div class="stat-box">
             <div class="stat-label">ОРУЖИЕ</div>
             <div class="stat-value" id="uiWeapon" style="color: #f1c40f;">Пистолет</div>
         </div>
-        <div class="stat-box">
-            <div class="stat-label">ЗОЛОТЫЕ МОНЕТЫ</div>
-            <div class="stat-value" id="uiCoins" style="color: #f1c40f;">0</div>
-        </div>
-        <button id="btnUpgradeLaser" class="btn btn-upgrade">Улучшить Лазер</button>
-        
         <div class="stat-box">
             <div class="stat-label">ГРАНАТЫ (R)</div>
             <div class="stat-value" id="uiGrenades" style="color: #e67e22;">0</div>
@@ -94,18 +95,52 @@
         </div>
         
         <div style="flex-grow: 1;"></div>
-        <div style="color: #888; font-size: 0.75rem; margin-bottom: 10px;">Гранаты: R | Пауза: P</div>
+        <div style="color: #888; font-size: 0.75rem; margin-bottom: 10px;">WASD: Движение<br>R: Гранаты<br>P: Пауза</div>
         <button id="btnSpeed" class="btn" style="background-color: #8e44ad; padding: 8px;">Скорость: x1</button>
+        <button id="btnPause" class="btn" style="background-color: #f39c12; padding: 8px;">Пауза (P)</button>
         <button id="btnSave" class="btn" style="background-color: #2980b9; padding: 8px;">Сохранить</button>
         <button id="btnLoad" class="btn" style="background-color: #27ae60; padding: 8px;">Загрузить</button>
     </div>
 
+    <!-- ИГРОВОЕ ПОЛЕ -->
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="screenOverlay" class="overlay active">
             <h1 id="overlayTitle">Wasteland Survivor</h1>
             <p id="overlayDesc" style="color: #ccc;">Готовься к боли.</p>
             <button id="actionBtn" class="btn" style="width: auto; padding: 15px 40px; font-size: 1.2rem;">Начать игру</button>
+        </div>
+    </div>
+
+    <!-- ПРАВАЯ ПАНЕЛЬ -->
+    <div id="rightPanel" class="side-panel">
+        <h2>ПРОКАЧКА</h2>
+        <div class="stat-box">
+            <div class="stat-label">ЗОЛОТЫЕ МОНЕТЫ</div>
+            <div class="stat-value" id="uiCoins" style="color: #f1c40f;">0</div>
+        </div>
+        <button id="btnUpgradeLaser" class="btn btn-upgrade" style="margin-top: 0; margin-bottom: 20px;">Улучшить Лазер</button>
+        
+        <h2>ИНФО ОБ ИГРЕ</h2>
+        <div class="stat-box">
+            <div class="stat-label">КИБЕРЗОМБИ В ВОЛНЕ</div>
+            <div class="stat-value" id="uiInfoCyber">0%</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">ДРОП ГРАНАТ</div>
+            <div class="stat-value" id="uiInfoGrenade" style="color: #e67e22;">2.00%</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">ДРОП БРОНИ</div>
+            <div class="stat-value" id="uiInfoArmor" style="color: #3498db;">0.00%</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">ДРОП АПТЕЧЕК</div>
+            <div class="stat-value" id="uiInfoMedkit" style="color: #e74c3c;">0.00%</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">ДРОП МОНЕТ</div>
+            <div class="stat-value" style="color: #f1c40f;">1% <span style="font-size: 0.7rem">(с Кибер)</span></div>
         </div>
     </div>
 </div>
@@ -118,17 +153,25 @@ const overlayTitle = document.getElementById('overlayTitle');
 const overlayDesc = document.getElementById('overlayDesc');
 const actionBtn = document.getElementById('actionBtn');
 
+// Левая панель
 const uiLevel = document.getElementById('uiLevel');
 const uiWave = document.getElementById('uiWave');
 const uiWaveLeft = document.getElementById('uiWaveLeft');
+const uiKills = document.getElementById('uiKills');
 const uiWeapon = document.getElementById('uiWeapon');
-const uiCoins = document.getElementById('uiCoins');
-const btnUpgradeLaser = document.getElementById('btnUpgradeLaser');
 const uiGrenades = document.getElementById('uiGrenades');
 const uiHpText = document.getElementById('uiHpText');
 const uiHpBar = document.getElementById('uiHpBar');
 const uiArmorText = document.getElementById('uiArmorText');
 const uiArmorBar = document.getElementById('uiArmorBar');
+
+// Правая панель
+const uiCoins = document.getElementById('uiCoins');
+const btnUpgradeLaser = document.getElementById('btnUpgradeLaser');
+const uiInfoCyber = document.getElementById('uiInfoCyber');
+const uiInfoGrenade = document.getElementById('uiInfoGrenade');
+const uiInfoArmor = document.getElementById('uiInfoArmor');
+const uiInfoMedkit = document.getElementById('uiInfoMedkit');
 
 const WORLD_WIDTH = 3000;
 const WORLD_HEIGHT = 3000;
@@ -162,6 +205,7 @@ window.addEventListener('keyup', e => {
 actionBtn.addEventListener('click', () => initGame());
 document.getElementById('btnSave').addEventListener('click', saveGame);
 document.getElementById('btnLoad').addEventListener('click', loadGame);
+document.getElementById('btnPause').addEventListener('click', togglePause);
 document.getElementById('btnSpeed').addEventListener('click', () => {
     gameSpeed++; if (gameSpeed > 4) gameSpeed = 1;
     document.getElementById('btnSpeed').innerText = `Скорость: x${gameSpeed}`;
@@ -181,6 +225,7 @@ btnUpgradeLaser.addEventListener('click', () => {
 function togglePause() {
     if (!isGameRunning || player.hp <= 0) return;
     isPaused = !isPaused;
+    document.getElementById('btnPause').innerText = isPaused ? "Продолжить (P)" : "Пауза (P)";
 }
 
 function saveGame() {
@@ -204,6 +249,7 @@ function loadGame() {
     currentLevel = parsed.currentLevel; waveIndex = parsed.waveIndex; totalKills = parsed.totalKills || 0;
     bullets = []; zombies = []; enemyProjectiles = []; acidPools = []; items = []; thrownGrenades = []; explosions = [];
     isGameRunning = true; isPaused = false;
+    document.getElementById('btnPause').innerText = "Пауза (P)";
     overlay.classList.remove('active');
     spawnWave();
 }
@@ -218,6 +264,7 @@ function initGame() {
     bullets = []; zombies = []; enemyProjectiles = []; acidPools = []; items = []; thrownGrenades = []; explosions = [];
     keys = {}; currentLevel = 1; waveIndex = 0; zombiesRemainingToSpawn = 0; totalKills = 0;
     isGameRunning = true; isPaused = false;
+    document.getElementById('btnPause').innerText = "Пауза (P)";
     overlay.classList.remove('active');
     spawnWave();
 }
@@ -229,13 +276,12 @@ function getWeaponStats() {
     if (player.weapon === 'plasma_cutter') return { speed: 8, damage: 3, name: 'Плазменный резак', pierce: true };
     if (player.weapon === 'laser_beam') return { 
         continuous: true, 
-        damage: 0.5 + (player.laserLevel * 0.5), // Урон за каждый кадр!
+        damage: 0.5 + (player.laserLevel * 0.5),
         width: 10 + (player.laserLevel * 4), 
         name: `Луч Смерти (Ур.${player.laserLevel})` 
     };
 }
 
-// Математика для пересечения статичного луча и круга зомби
 function distToSegmentSquared(p, v, w) {
     let l2 = (w.x - v.x)**2 + (w.y - v.y)**2;
     if (l2 == 0) return (p.x - v.x)**2 + (p.y - v.y)**2;
@@ -349,7 +395,6 @@ function update() {
         for (let i = 0; i < spawnCount; i++) { spawnEnemy('normal'); zombiesRemainingToSpawn--; }
     }
 
-    // Пилы
     if (player.hasSaws) {
         player.sawAngle += 0.05;
         const orbitRadius = player.sawRadius || 60;
@@ -360,7 +405,6 @@ function update() {
         }
     }
     
-    // Питомец
     if (pet.active) {
         let targetItem = null; let minDist = 500;
         for (let i of items) {
@@ -402,7 +446,6 @@ function update() {
 
     let stats = getWeaponStats();
     
-    // Оружие: Непрерывный лазер
     if (stats.continuous && nearestZombie) {
         let angle = Math.atan2(nearestZombie.y - player.y, nearestZombie.x - player.x);
         player.laserData = { active: true, angle: angle, width: stats.width };
@@ -420,7 +463,6 @@ function update() {
     } else if (stats.continuous) {
         player.laserData = { active: false };
     } 
-    // Обычное огнестрельное оружие
     else {
         player.laserData = { active: false };
         if (player.shootCooldown > 0) player.shootCooldown--;
@@ -434,7 +476,6 @@ function update() {
         }
     }
 
-    // Движение пуль
     for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         b.x += b.vx; b.y += b.vy;
@@ -454,7 +495,6 @@ function update() {
         if (hit) bullets.splice(i, 1);
     }
 
-    // Гранаты
     for (let i = thrownGrenades.length - 1; i >= 0; i--) {
         let g = thrownGrenades[i];
         g.timer--;
@@ -479,7 +519,6 @@ function update() {
         if (explosions[i].life <= 0) explosions.splice(i, 1);
     }
 
-    // Физика толпы
     for (let i = 0; i < zombies.length; i++) {
         for (let j = i + 1; j < zombies.length; j++) {
             let z1 = zombies[i], z2 = zombies[j];
@@ -494,17 +533,15 @@ function update() {
         }
     }
 
-    // Урон от кислотных луж
     for(let i = acidPools.length - 1; i >= 0; i--){
         let p = acidPools[i];
         p.life--;
         if(p.life <= 0) { acidPools.splice(i,1); continue; }
         if(Math.hypot(player.x - p.x, player.y - p.y) < p.radius + player.radius) {
-            takeDamage(0.2); // Постепенный урон в луже
+            takeDamage(0.2); 
         }
     }
 
-    // Вражеские снаряды
     for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
         let ep = enemyProjectiles[i];
         if (ep.type === 'poison') {
@@ -530,7 +567,6 @@ function update() {
         }
     }
 
-    // Поведение зомби
     for (let i = zombies.length - 1; i >= 0; i--) {
         let z = zombies[i];
         if (z.deadMark) { killZombie(z); zombies.splice(i, 1); continue; }
@@ -540,8 +576,6 @@ function update() {
 
         if (z.type === 'boss') {
             z.timer++;
-            
-            // Навыки уникальных боссов
             if (z.bossType === 'spitter' && z.timer % 300 === 0) {
                 let pAngle = Math.atan2(player.y - z.y, player.x - z.x);
                 enemyProjectiles.push({ type: 'poison', x: z.x, y: z.y, vx: Math.cos(pAngle)*5, vy: Math.sin(pAngle)*5, radius: 8 });
@@ -549,8 +583,6 @@ function update() {
             if (z.bossType === 'barmaglot' && z.timer % 240 === 0) {
                 enemyProjectiles.push({ type: 'grenade', startX: z.x, startY: z.y, x: z.x, y: z.y, targetX: player.x, targetY: player.y, timer: 90, blastRadius: 80 });
             }
-
-            // Общий навык боссов начиная с 5 уровня: Плевок кислотой
             if (currentLevel >= 5 && z.timer % 180 === 0) {
                 enemyProjectiles.push({ type: 'acid_spit', startX: z.x, startY: z.y, x: z.x, y: z.y, targetX: player.x, targetY: player.y, timer: 60 });
             }
@@ -558,7 +590,6 @@ function update() {
         if (Math.hypot(player.x - z.x, player.y - z.y) < player.radius + z.radius) { takeDamage(z.type === 'boss' ? 0.5 : 0.1); }
     }
 
-    // Подбор предметов
     for (let i = items.length - 1; i >= 0; i--) {
         let item = items[i];
         if (Math.hypot(item.x - player.x, item.y - player.y) < player.radius + item.radius) {
@@ -608,9 +639,8 @@ function killZombie(z) {
         else if (currentLevel > 10 && currentLevel !== 18 && currentLevel !== 25) items.push({ type: 'saw_upgrade', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel !== 3) items.push({ type: 'generic_boss_loot', x: z.x, y: z.y, radius: 25 });
     } else if (z.type === 'cyber') {
-        if (Math.random() < 0.01) items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); // Шанс урезан до 1%
+        if (Math.random() < 0.01) items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); 
     } else {
-        // Угасающий дроп. Формула: Базовый шанс * (0.9 ^ Уровней_с_момента_появления)
         let grenadeChance = 0.02 * Math.pow(0.9, Math.max(0, currentLevel - 1));
         let armorChance = 0.10 * Math.pow(0.9, Math.max(0, currentLevel - 3));
         let medkitChance = 0.05 * Math.pow(0.9, Math.max(0, currentLevel - 4));
@@ -625,7 +655,10 @@ function levelUp() { currentLevel++; waveIndex = 0; spawnWave(); }
 
 function updateUI() {
     if(!isGameRunning) return;
+    
+    // ЛЕВАЯ ПАНЕЛЬ
     uiLevel.innerText = currentLevel;
+    uiKills.innerText = totalKills;
     
     if (waveIndex < waveBaseCounts.length) {
         uiWave.innerText = `${waveIndex + 1} / 5`;
@@ -636,6 +669,14 @@ function updateUI() {
     
     uiWeapon.innerText = getWeaponStats().name;
     uiGrenades.innerText = player.grenades;
+    
+    let hpPerc = Math.max(0, (player.hp / player.maxHp) * 100);
+    uiHpText.innerText = Math.round(player.hp); uiHpBar.style.width = hpPerc + '%';
+    
+    let armPerc = Math.max(0, (player.armor / player.maxArmor) * 100);
+    uiArmorText.innerText = Math.round(player.armor); uiArmorBar.style.width = armPerc + '%';
+    
+    // ПРАВАЯ ПАНЕЛЬ
     uiCoins.innerText = player.coins;
     
     if (player.weapon === 'laser_beam' && player.laserLevel < 10) {
@@ -647,11 +688,17 @@ function updateUI() {
         btnUpgradeLaser.style.display = 'none';
     }
     
-    let hpPerc = Math.max(0, (player.hp / player.maxHp) * 100);
-    uiHpText.innerText = Math.round(player.hp); uiHpBar.style.width = hpPerc + '%';
+    let cyberChance = currentLevel >= 19 ? Math.min(100, (currentLevel - 18) * 5) : 0;
+    uiInfoCyber.innerText = cyberChance + '%';
     
-    let armPerc = Math.max(0, (player.armor / player.maxArmor) * 100);
-    uiArmorText.innerText = Math.round(player.armor); uiArmorBar.style.width = armPerc + '%';
+    let grenadeChance = (0.02 * Math.pow(0.9, Math.max(0, currentLevel - 1)) * 100).toFixed(2);
+    uiInfoGrenade.innerText = grenadeChance + '%';
+    
+    let armorChance = currentLevel >= 3 ? (0.10 * Math.pow(0.9, Math.max(0, currentLevel - 3)) * 100).toFixed(2) : 0;
+    uiInfoArmor.innerText = armorChance + '%';
+    
+    let medkitChance = currentLevel >= 4 ? (0.05 * Math.pow(0.9, Math.max(0, currentLevel - 4)) * 100).toFixed(2) : 0;
+    uiInfoMedkit.innerText = medkitChance + '%';
 }
 
 function draw() {
@@ -670,13 +717,11 @@ function draw() {
     ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 8;
     ctx.strokeRect(-cameraX, -cameraY, WORLD_WIDTH, WORLD_HEIGHT);
 
-    // Кислотные лужи (под лутом и игроком)
     for (let p of acidPools) {
         ctx.fillStyle = `rgba(46, 204, 113, ${p.life / p.maxLife * 0.6})`;
         ctx.beginPath(); ctx.arc(p.x - cameraX, p.y - cameraY, p.radius, 0, Math.PI*2); ctx.fill();
     }
 
-    // Лут
     for (let item of items) {
         ctx.save(); ctx.translate(item.x - cameraX, item.y - cameraY);
         if (item.type === 'machine_gun') { ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); } 
@@ -713,13 +758,11 @@ function draw() {
         }
     }
 
-    // Взрывы
     for(let ex of explosions) {
         ctx.fillStyle = `rgba(230, 126, 34, ${ex.life/10})`;
         ctx.beginPath(); ctx.arc(ex.x - cameraX, ex.y - cameraY, ex.radius, 0, Math.PI*2); ctx.fill();
     }
 
-    // Летящие гранаты
     for(let g of thrownGrenades) {
         ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath(); ctx.arc(g.x - cameraX, g.y - cameraY, 6, 0, Math.PI*2); ctx.fill();
@@ -729,7 +772,6 @@ function draw() {
         ctx.fillRect(g.x - cameraX - 2, g.y - cameraY - (g.z || 0) - 8, 4, 4);
     }
 
-    // Снаряды врагов
     for (let ep of enemyProjectiles) {
         if (ep.type === 'poison') {
             ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(ep.x - cameraX, ep.y - cameraY, ep.radius, 0, Math.PI*2); ctx.fill();
@@ -742,14 +784,13 @@ function draw() {
         }
     }
 
-    // Статичный Лазер (под пулями)
     if (player.weapon === 'laser_beam' && player.laserData && player.laserData.active) {
         let stats = getWeaponStats();
         let endX = player.x + Math.cos(player.laserData.angle) * 2000;
         let endY = player.y + Math.sin(player.laserData.angle) * 2000;
         
         ctx.save();
-        ctx.strokeStyle = 'rgba(255, 0, 255, 0.6)'; // Свечение
+        ctx.strokeStyle = 'rgba(255, 0, 255, 0.6)'; 
         ctx.lineWidth = stats.width;
         ctx.shadowColor = '#ff00ff';
         ctx.shadowBlur = 20;
@@ -759,13 +800,12 @@ function draw() {
         ctx.lineTo(endX - cameraX, endY - cameraY);
         ctx.stroke();
         
-        ctx.strokeStyle = '#fff'; // Ядро лазера
+        ctx.strokeStyle = '#fff'; 
         ctx.lineWidth = stats.width * 0.4;
         ctx.stroke();
         ctx.restore();
     }
 
-    // Пули игрока
     for (let b of bullets) {
         if (player.weapon === 'plasma_cutter') {
             ctx.fillStyle = '#00ffff'; ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 10;
@@ -775,7 +815,6 @@ function draw() {
         }
     }
 
-    // Питомец
     if (pet.active) {
         ctx.save(); ctx.translate(pet.x - cameraX, pet.y - cameraY);
         ctx.fillStyle = '#d35400'; ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI*2); ctx.fill();
@@ -785,7 +824,6 @@ function draw() {
         ctx.restore();
     }
 
-    // Зомби
     for (let z of zombies) {
         if (z.type === 'normal') ctx.fillStyle = '#27ae60';
         else if (z.type === 'cyber') ctx.fillStyle = '#7f8c8d'; 
@@ -818,11 +856,9 @@ function draw() {
         }
     }
 
-    // Игрок
     ctx.save(); ctx.translate(player.x - cameraX, player.y - cameraY);
     ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.arc(0, 0, player.radius, 0, Math.PI*2); ctx.fill();
     
-    // Поворот пушки
     let targetAngle = 0;
     if (player.laserData && player.laserData.active) {
         targetAngle = player.laserData.angle;
