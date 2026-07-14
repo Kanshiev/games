@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 6.2 (Dual UI Panels & Info)</title>
+    <title>Survivor.io - Alpha 6.3 (CyberZombonator & Power Laser)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -127,6 +127,10 @@
             <div class="stat-value" id="uiInfoCyber">0%</div>
         </div>
         <div class="stat-box">
+            <div class="stat-label">ЗОМБОНАТОРЫ В ВОЛНЕ</div>
+            <div class="stat-value" id="uiInfoZomb" style="color: #e74c3c;">0%</div>
+        </div>
+        <div class="stat-box">
             <div class="stat-label">ДРОП ГРАНАТ</div>
             <div class="stat-value" id="uiInfoGrenade" style="color: #e67e22;">2.00%</div>
         </div>
@@ -140,7 +144,7 @@
         </div>
         <div class="stat-box">
             <div class="stat-label">ДРОП МОНЕТ</div>
-            <div class="stat-value" style="color: #f1c40f;">1% <span style="font-size: 0.7rem">(с Кибер)</span></div>
+            <div class="stat-value" style="color: #f1c40f; font-size: 0.8rem">1% (Кибер)<br>100% (Зомбонатор)</div>
         </div>
     </div>
 </div>
@@ -169,6 +173,7 @@ const uiArmorBar = document.getElementById('uiArmorBar');
 const uiCoins = document.getElementById('uiCoins');
 const btnUpgradeLaser = document.getElementById('btnUpgradeLaser');
 const uiInfoCyber = document.getElementById('uiInfoCyber');
+const uiInfoZomb = document.getElementById('uiInfoZomb');
 const uiInfoGrenade = document.getElementById('uiInfoGrenade');
 const uiInfoArmor = document.getElementById('uiInfoArmor');
 const uiInfoMedkit = document.getElementById('uiInfoMedkit');
@@ -276,7 +281,8 @@ function getWeaponStats() {
     if (player.weapon === 'plasma_cutter') return { speed: 8, damage: 3, name: 'Плазменный резак', pierce: true };
     if (player.weapon === 'laser_beam') return { 
         continuous: true, 
-        damage: 0.5 + (player.laserLevel * 0.5),
+        // ЗДЕСЬ МЕНЯЕТСЯ МОЩНОСТЬ ЛУЧА. Увеличь 1.5 на большее значение для усиления.
+        damage: 0.5 + (player.laserLevel * 1.5), 
         width: 10 + (player.laserLevel * 4), 
         name: `Луч Смерти (Ур.${player.laserLevel})` 
     };
@@ -328,13 +334,26 @@ function spawnEnemy(type) {
     let zy = Math.max(50, Math.min(WORLD_HEIGHT - 50, player.y + Math.sin(angle) * distance));
 
     if (type === 'normal') {
+        let isZombonator = false;
         let isCyber = false;
-        if (currentLevel >= 19) {
+        
+        // Шанс на Зомбонатора (С 28 уровня)
+        if (currentLevel >= 28) {
+            let zombChance = (currentLevel - 27) * 0.05; 
+            if (Math.random() < zombChance) isZombonator = true;
+        }
+        
+        // Шанс на Киберзомби (С 19 уровня), если не прокнул Зомбонатор
+        if (!isZombonator && currentLevel >= 19) {
             let cyberChance = (currentLevel - 18) * 0.05; 
             if (Math.random() < cyberChance) isCyber = true;
         }
+        
         let baseHp = 3 * (1 + (currentLevel-1)*0.2);
-        if (isCyber) {
+        
+        if (isZombonator) {
+            zombies.push({ type: 'zombonator', x: zx, y: zy, radius: 18, speed: 0.4 + Math.random()*0.1, hp: baseHp * 15, maxHp: baseHp * 15 });
+        } else if (isCyber) {
             zombies.push({ type: 'cyber', x: zx, y: zy, radius: 16, speed: 0.5 + Math.random()*0.1, hp: baseHp * 5, maxHp: baseHp * 5 });
         } else {
             zombies.push({ type: 'normal', x: zx, y: zy, radius: 14, speed: 0.5 + Math.random()*0.2, hp: baseHp, maxHp: baseHp });
@@ -350,7 +369,8 @@ function spawnEnemy(type) {
             16: {name: "СКРАМ-МАСТЕР", hp: 45000, rad: 45, speed: 1.1},
             17: {name: "БОСС-ВЕРТОЛЕТ", hp: 55000, rad: 45, speed: 1.3},
             18: {name: "КВАНТОВЫЙ ДУШНИЛА", hp: 70000, rad: 48, speed: 0.8},
-            25: {name: "ПОВЕЛИТЕЛЬ ШЕРСТИ", hp: 150000, rad: 55, speed: 1.0} 
+            25: {name: "ПОВЕЛИТЕЛЬ ШЕРСТИ", hp: 150000, rad: 55, speed: 1.0},
+            28: {name: "СОЗДАТЕЛЬ ЗОМБОНАТОРОВ", hp: 250000, rad: 60, speed: 0.7}
         };
         let conf = bossConfigs[currentLevel] || {name: `СВЕРХМУТАНТ УР. ${currentLevel}`, hp: 35000 + (currentLevel - 15) * 8000, rad: 45, speed: 1.0};
         boss.name = conf.name; boss.radius = conf.rad; boss.speed = conf.speed; 
@@ -638,6 +658,8 @@ function killZombie(z) {
         else if (currentLevel === 25) items.push({ type: 'pet_unlock', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel > 10 && currentLevel !== 18 && currentLevel !== 25) items.push({ type: 'saw_upgrade', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel !== 3) items.push({ type: 'generic_boss_loot', x: z.x, y: z.y, radius: 25 });
+    } else if (z.type === 'zombonator') {
+        items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); // 100% дроп
     } else if (z.type === 'cyber') {
         if (Math.random() < 0.01) items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); 
     } else {
@@ -690,6 +712,9 @@ function updateUI() {
     
     let cyberChance = currentLevel >= 19 ? Math.min(100, (currentLevel - 18) * 5) : 0;
     uiInfoCyber.innerText = cyberChance + '%';
+    
+    let zombChance = currentLevel >= 28 ? Math.min(100, (currentLevel - 27) * 5) : 0;
+    uiInfoZomb.innerText = zombChance + '%';
     
     let grenadeChance = (0.02 * Math.pow(0.9, Math.max(0, currentLevel - 1)) * 100).toFixed(2);
     uiInfoGrenade.innerText = grenadeChance + '%';
@@ -827,6 +852,7 @@ function draw() {
     for (let z of zombies) {
         if (z.type === 'normal') ctx.fillStyle = '#27ae60';
         else if (z.type === 'cyber') ctx.fillStyle = '#7f8c8d'; 
+        else if (z.type === 'zombonator') ctx.fillStyle = '#2c3e50'; 
         else if (z.bossType === 'fatty') ctx.fillStyle = '#8e44ad'; 
         else if (z.bossType === 'spitter') ctx.fillStyle = '#1abc9c'; 
         else if (z.bossType === 'barmaglot') ctx.fillStyle = '#c0392b'; 
@@ -839,7 +865,7 @@ function draw() {
         let zAngle = Math.atan2(player.y - z.y, player.x - z.x);
         ctx.save(); ctx.translate(z.x - cameraX, z.y - cameraY); ctx.rotate(zAngle);
         
-        ctx.fillStyle = z.type === 'cyber' ? '#00ffff' : '#000'; 
+        ctx.fillStyle = z.type === 'cyber' ? '#00ffff' : (z.type === 'zombonator' ? '#e74c3c' : '#000'); 
         ctx.beginPath(); ctx.arc(z.radius/2, -z.radius/3, z.radius/6, 0, Math.PI*2);
         ctx.arc(z.radius/2, z.radius/3, z.radius/6, 0, Math.PI*2); ctx.fill();
         ctx.restore();
