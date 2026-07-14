@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 4.3 (60 FPS Lock & Stats)</title>
+    <title>Survivor.io - Alpha 4.3.1 (Hotfix)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -129,7 +129,7 @@ const uiArmorBar = document.getElementById('uiArmorBar');
 const WORLD_WIDTH = 3000;
 const WORLD_HEIGHT = 3000;
 
-// ТУТ МЕНЯЕТСЯ ЛИМИТ СПАВНА МОБОВ! Меняй 300 на сколько угодно.
+// ТУТ МЕНЯЕТСЯ ЛИМИТ СПАВНА МОБОВ!
 const MAX_ACTIVE_ZOMBIES = 300; 
 
 let player = { 
@@ -307,20 +307,18 @@ function spawnEnemy(type) {
     }
 }
 
-// ОГРАНИЧИТЕЛЬ КАДРОВ (FPS LOCK) - уравнивает скорость игры на всех мониторах
 let lastFrameTime = performance.now();
 const FPS_LIMIT = 60;
 const FRAME_DELAY = 1000 / FPS_LIMIT;
 
-function gameLoop() {
+function gameLoop(currentTime) {
     requestAnimationFrame(gameLoop);
     
-    const now = performance.now();
-    const delta = now - lastFrameTime;
+    if (!currentTime) currentTime = performance.now();
+    const delta = currentTime - lastFrameTime;
     
-    // Выполняем расчеты только если прошло достаточно времени (1/60 секунды)
     if (delta >= FRAME_DELAY) {
-        lastFrameTime = now - (delta % FRAME_DELAY); // Коррекция времени
+        lastFrameTime = currentTime - (delta % FRAME_DELAY); 
         
         if (isGameRunning && !isPaused) {
             update(); 
@@ -536,7 +534,7 @@ function takeDamage(amount) {
 }
 
 function killZombie(z) {
-    totalKills++; // Считаем каждого убитого
+    totalKills++; 
     
     if (z.type === 'boss') {
         if (currentLevel === 1) items.push({ type: 'machine_gun', x: z.x, y: z.y, radius: 25 });
@@ -748,8 +746,8 @@ function endGame(isVictory) {
     actionBtn.textContent = "Начать заново";
 }
 
-// Первичный старт
-draw();
+// ЗАПУСК ЦИКЛА ВЕРНУЛСЯ!
+requestAnimationFrame(gameLoop);
 </script>
 
 </body>
