@@ -793,7 +793,7 @@ function update() {
             else if (item.type === 'plasma_cutter') { player.weapon = 'plasma_cutter'; levelUp(); }
             else if (item.type === 'laser_beam') { player.weapon = 'laser_beam'; levelUp(); }
             else if (item.type === 'pet_unlock') { pet.active = true; pet.x = player.x; pet.y = player.y; pet.level = pet.level || 0; levelUp(); }
-            else if (item.type === 'magnet_upgrade') { player.magnetRadius = (player.magnetRadius || 0) + 100; levelUp(); }
+            else if (item.type === 'magnet_upgrade') { player.magnetRadius = (player.magnetRadius || 0) + 1100; levelUp(); }
             else if (item.type === 'saw_upgrade') { player.sawCount = (player.sawCount || 3) + 1; player.sawRadius = (player.sawRadius || 60) + 10; levelUp(); }
             else if (item.type === 'generic_boss_loot') { levelUp(); }
             else if (item.type === 'armor_shard') player.armor = Math.min(player.maxArmor, player.armor + (player.maxArmor * 0.1));
