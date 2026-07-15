@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 8.1 (Pet Fix)</title>
+    <title>Survivor.io - Alpha 9.0 (ZomboTanks)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -156,6 +156,10 @@
                 <div class="stat-value" id="uiInfoZomb" style="color: #e74c3c;">0%</div>
             </div>
             <div class="stat-box">
+                <div class="stat-label">ЗОМБОТАНКИ В ВОЛНЕ</div>
+                <div class="stat-value" id="uiInfoTank" style="color: #8e44ad;">0%</div>
+            </div>
+            <div class="stat-box">
                 <div class="stat-label">ДРОП ГРАНАТ</div>
                 <div class="stat-value" id="uiInfoGrenade" style="color: #e67e22;">15.00%</div>
             </div>
@@ -169,7 +173,7 @@
             </div>
             <div class="stat-box">
                 <div class="stat-label">ДРОП МОНЕТ</div>
-                <div class="stat-value" style="color: #f1c40f; font-size: 0.8rem">1% (Кибер)<br>100% (Зомбонатор)</div>
+                <div class="stat-value" style="color: #f1c40f; font-size: 0.75rem">1% (Кибер)<br>100% 1шт (Зомбонатор)<br>100% 10шт (Танк)</div>
             </div>
         </div>
     </div>
@@ -204,6 +208,7 @@ const btnUpgradeLaser = document.getElementById('btnUpgradeLaser');
 const btnUpgradePet = document.getElementById('btnUpgradePet');
 const uiInfoCyber = document.getElementById('uiInfoCyber');
 const uiInfoZomb = document.getElementById('uiInfoZomb');
+const uiInfoTank = document.getElementById('uiInfoTank');
 const uiInfoGrenade = document.getElementById('uiInfoGrenade');
 const uiInfoArmor = document.getElementById('uiInfoArmor');
 const uiInfoMedkit = document.getElementById('uiInfoMedkit');
@@ -245,7 +250,6 @@ window.addEventListener('keyup', e => {
     keys[e.code] = false;
     if (e.code === 'KeyR') {
         if (rHeld && !rTriggered) {
-            // Если отпустили до мегабомбы - кидаем одну гранату
             if (player.grenades > 0) throwPlayerGrenade();
         }
         rHeld = false;
@@ -416,22 +420,30 @@ function spawnEnemy(type) {
     let zy = Math.max(50, Math.min(WORLD_HEIGHT - 50, player.y + Math.sin(angle) * distance));
 
     if (type === 'normal') {
+        let isZombotank = false;
         let isZombonator = false;
         let isCyber = false;
         
-        if (currentLevel >= 28) {
+        if (currentLevel >= 35) {
+            let tankChance = (currentLevel - 34) * 0.10; 
+            if (Math.random() < tankChance) isZombotank = true;
+        }
+
+        if (!isZombotank && currentLevel >= 28) {
             let zombChance = (currentLevel - 27) * 0.05; 
             if (Math.random() < zombChance) isZombonator = true;
         }
         
-        if (!isZombonator && currentLevel >= 19) {
+        if (!isZombotank && !isZombonator && currentLevel >= 19) {
             let cyberChance = (currentLevel - 18) * 0.05; 
             if (Math.random() < cyberChance) isCyber = true;
         }
         
         let baseHp = 3 * (1 + (currentLevel-1)*0.2);
         
-        if (isZombonator) {
+        if (isZombotank) {
+            zombies.push({ type: 'zombotank', x: zx, y: zy, radius: 24, speed: 0.3 + Math.random()*0.1, hp: baseHp * 40, maxHp: baseHp * 40 });
+        } else if (isZombonator) {
             zombies.push({ type: 'zombonator', x: zx, y: zy, radius: 18, speed: 0.4 + Math.random()*0.1, hp: baseHp * 15, maxHp: baseHp * 15 });
         } else if (isCyber) {
             zombies.push({ type: 'cyber', x: zx, y: zy, radius: 16, speed: 0.5 + Math.random()*0.1, hp: baseHp * 5, maxHp: baseHp * 5 });
@@ -478,7 +490,6 @@ function spawnEnemy(type) {
             35: {name: "ФИНАЛЬНЫЙ БОСС КАЧАЛКИ", hp: 1000000, rad: 65, speed: 1.0, emoji: "🏋️"}
         };
         let conf = bossConfigs[currentLevel] || {name: `СВЕРХМУТАНТ УР. ${currentLevel}`, hp: Math.max(1000, 35000 + (currentLevel - 15) * 8000), rad: 45, speed: 1.0, emoji: "👽"};
-        
         boss.name = conf.name; boss.radius = conf.rad; boss.speed = conf.speed; 
         boss.hp = conf.hp; boss.maxHp = conf.hp; boss.bossType = conf.bType || 'generic';
         boss.emoji = conf.emoji;
@@ -819,6 +830,16 @@ function killZombie(z) {
         else if (currentLevel === 25) items.push({ type: 'pet_unlock', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel > 10 && currentLevel !== 18 && currentLevel !== 25) items.push({ type: 'saw_upgrade', x: z.x, y: z.y, radius: 25 });
         else items.push({ type: 'generic_boss_loot', x: z.x, y: z.y, radius: 25 });
+    } else if (z.type === 'zombotank') {
+        for(let i=0; i<10; i++){
+            items.push({ type: 'coin', x: z.x + (Math.random()*40-20), y: z.y + (Math.random()*40-20), radius: 10 });
+        }
+        let grenadeChance = 0.15 * Math.pow(0.95, Math.max(0, currentLevel - 1));
+        let armorChance = 0.10 * Math.pow(0.9, Math.max(0, currentLevel - 3));
+        let medkitChance = 0.05 * Math.pow(0.9, Math.max(0, currentLevel - 4));
+        if (Math.random() < grenadeChance) items.push({ type: 'player_grenade_pickup', x: z.x, y: z.y, radius: 10 }); 
+        if (currentLevel >= 3 && Math.random() < armorChance) items.push({ type: 'armor_shard', x: z.x, y: z.y, radius: 10 });
+        if (currentLevel >= 4 && Math.random() < medkitChance) items.push({ type: 'medkit', x: z.x, y: z.y, radius: 10 });
     } else if (z.type === 'zombonator') {
         items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); 
     } else if (z.type === 'cyber') {
@@ -884,6 +905,9 @@ function updateUI() {
     
     let zombChance = currentLevel >= 28 ? Math.min(100, (currentLevel - 27) * 5) : 0;
     uiInfoZomb.innerText = zombChance + '%';
+    
+    let tankChance = currentLevel >= 35 ? Math.min(100, (currentLevel - 34) * 10) : 0;
+    uiInfoTank.innerText = tankChance + '%';
     
     let grenadeChance = (0.15 * Math.pow(0.95, Math.max(0, currentLevel - 1)) * 100).toFixed(2);
     uiInfoGrenade.innerText = grenadeChance + '%';
@@ -1056,7 +1080,8 @@ function draw() {
     }
 
     for (let z of zombies) {
-        if (z.type === 'normal') ctx.fillStyle = '#27ae60';
+        if (z.type === 'zombotank') ctx.fillStyle = '#556b2f'; 
+        else if (z.type === 'normal') ctx.fillStyle = '#27ae60';
         else if (z.type === 'cyber') ctx.fillStyle = '#7f8c8d'; 
         else if (z.type === 'zombonator') ctx.fillStyle = '#2c3e50'; 
         else if (z.bossType === 'fatty') ctx.fillStyle = '#8e44ad'; 
@@ -1071,7 +1096,7 @@ function draw() {
         let zAngle = Math.atan2(player.y - z.y, player.x - z.x);
         ctx.save(); ctx.translate(z.x - cameraX, z.y - cameraY); ctx.rotate(zAngle);
         
-        ctx.fillStyle = z.type === 'cyber' ? '#00ffff' : (z.type === 'zombonator' ? '#e74c3c' : '#000'); 
+        ctx.fillStyle = z.type === 'cyber' ? '#00ffff' : (z.type === 'zombonator' ? '#e74c3c' : (z.type === 'zombotank' ? '#f1c40f' : '#000')); 
         ctx.beginPath(); ctx.arc(z.radius/2, -z.radius/3, z.radius/6, 0, Math.PI*2);
         ctx.arc(z.radius/2, z.radius/3, z.radius/6, 0, Math.PI*2); ctx.fill();
         ctx.restore();
