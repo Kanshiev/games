@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 7.0 (Boss Trophies & Fixes)</title>
+    <title>Survivor.io - Alpha 8.0 (MegaBomb & Laser Evolution)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -119,7 +119,7 @@
             </div>
             
             <div style="flex-grow: 1;"></div>
-            <div style="color: #888; font-size: 0.75rem; margin-bottom: 10px;">WASD: Движение<br>R: Гранаты<br>P: Пауза</div>
+            <div style="color: #888; font-size: 0.75rem; margin-bottom: 10px;">WASD: Движение<br>R: Гранаты<br>(Зажать R = МегаБомба)<br>P: Пауза</div>
             <button id="btnSpeed" class="btn" style="background-color: #8e44ad; padding: 8px;">Скорость: x1</button>
             <button id="btnPause" class="btn" style="background-color: #f39c12; padding: 8px;">Пауза (P)</button>
             <button id="btnSave" class="btn" style="background-color: #2980b9; padding: 8px;">Сохранить</button>
@@ -217,25 +217,40 @@ let pet = { active: false, x: 0, y: 0, angle: 0, level: 0 };
 let bullets = []; let zombies = []; let enemyProjectiles = []; let acidPools = []; let items = []; 
 let thrownGrenades = []; let explosions = []; 
 let keys = {};
+
+// Управление МегаБомбой
+let rHeld = false;
+let rTriggered = false;
+let rPressTime = 0;
+
 let currentLevel = 1; let waveIndex = 0; let totalKills = 0;
 let zombiesRemainingToSpawn = 0; 
 let isGameRunning = false; let isPaused = false;
 let gameSpeed = 1;
-let lastTrophyCount = 0; // Для оптимизации отрисовки трофеев
+let lastTrophyCount = 0;
 
 const waveBaseCounts = [15, 25, 40, 70, 120];
 
 window.addEventListener('keydown', e => {
     keys[e.code] = true;
     if (e.code === 'KeyP') togglePause();
-    if (e.code === 'KeyR' && !keys['r_locked']) {
-        keys['r_locked'] = true;
-        if (player.grenades > 0) throwPlayerGrenade();
+    if (e.code === 'KeyR' && !rHeld) {
+        rHeld = true;
+        rTriggered = false;
+        rPressTime = performance.now();
     }
 });
+
 window.addEventListener('keyup', e => {
     keys[e.code] = false;
-    if (e.code === 'KeyR') keys['r_locked'] = false;
+    if (e.code === 'KeyR') {
+        if (rHeld && !rTriggered) {
+            // Если отпустили до мегабомбы - кидаем одну гранату
+            if (player.grenades > 0) throwPlayerGrenade();
+        }
+        rHeld = false;
+        rTriggered = false;
+    }
 });
 
 actionBtn.addEventListener('click', () => initGame());
@@ -273,6 +288,10 @@ btnUpgradePet.addEventListener('click', () => {
             player.coins -= 10000;
             pet.level = 2;
             updateUI();
+        } else if (pet.level === 2 && player.coins >= 100000) {
+            player.coins -= 100000;
+            pet.level = 3;
+            updateUI();
         }
     }
 });
@@ -306,6 +325,7 @@ function loadGame() {
     currentLevel = parsed.currentLevel; waveIndex = parsed.waveIndex; totalKills = parsed.totalKills || 0;
     bullets = []; zombies = []; enemyProjectiles = []; acidPools = []; items = []; thrownGrenades = []; explosions = [];
     isGameRunning = true; isPaused = false;
+    rHeld = false; rTriggered = false;
     document.getElementById('btnPause').innerText = "Пауза (P)";
     overlay.classList.remove('active');
     spawnWave();
@@ -321,9 +341,10 @@ function initGame() {
     pet = { active: false, x: player.x, y: player.y, angle: 0, level: 0 };
     bullets = []; zombies = []; enemyProjectiles = []; acidPools = []; items = []; thrownGrenades = []; explosions = [];
     keys = {}; currentLevel = 1; waveIndex = 0; zombiesRemainingToSpawn = 0; totalKills = 0; lastTrophyCount = 0;
+    rHeld = false; rTriggered = false;
     isGameRunning = true; isPaused = false;
     
-    document.getElementById('bottomPanel').innerHTML = ''; // Очистка трофеев
+    document.getElementById('bottomPanel').innerHTML = '';
     document.getElementById('btnPause').innerText = "Пауза (P)";
     overlay.classList.remove('active');
     spawnWave();
@@ -351,7 +372,6 @@ function distToSegmentSquared(p, v, w) {
 }
 
 function throwPlayerGrenade() {
-    if (!isGameRunning || isPaused || player.grenades <= 0) return;
     let target = zombies.find(z => z.type === 'boss');
     if (!target) {
         let minDist = Infinity;
@@ -367,6 +387,15 @@ function throwPlayerGrenade() {
         x: player.x, y: player.y, startX: player.x, startY: player.y, targetX: target.x, targetY: target.y,
         timer: 40, maxTimer: 40 
     });
+}
+
+function triggerMegaBomb() {
+    for(let z of zombies) {
+        z.hp = 0;
+        if(!z.deadMark) z.deadMark = true;
+    }
+    // Огромная белая вспышка на весь экран
+    explosions.push({x: player.x, y: player.y, radius: 2000, life: 30, isMega: true});
 }
 
 function spawnWave() {
@@ -412,7 +441,6 @@ function spawnEnemy(type) {
         }
     } else if (type === 'boss') {
         let boss = { type: 'boss', x: zx, y: zy, timer: 0 };
-        // Полный список боссов от 1 до 35!
         const bossConfigs = {
             1: {name: "ТОЛСТЯК", hp: 80, rad: 35, speed: 0.6, emoji: "🧟"},
             2: {name: "ПЛЕВАЛЬЩИК", hp: 250, rad: 35, speed: 0.7, bType: 'spitter', emoji: "🤮"},
@@ -450,9 +478,7 @@ function spawnEnemy(type) {
             34: {name: "СВИДЕТЕЛЬ ИЕГОВЫ", hp: 750000, rad: 40, speed: 1.7, emoji: "🎫"},
             35: {name: "ФИНАЛЬНЫЙ БОСС КАЧАЛКИ", hp: 1000000, rad: 65, speed: 1.0, emoji: "🏋️"}
         };
-        // Надежный фоллбек, чтобы ХП никогда не уходило в минус на случайжных уровнях
         let conf = bossConfigs[currentLevel] || {name: `СВЕРХМУТАНТ УР. ${currentLevel}`, hp: Math.max(1000, 35000 + (currentLevel - 15) * 8000), rad: 45, speed: 1.0, emoji: "👽"};
-        
         boss.name = conf.name; boss.radius = conf.rad; boss.speed = conf.speed; 
         boss.hp = conf.hp; boss.maxHp = conf.hp; boss.bossType = conf.bType || 'generic';
         boss.emoji = conf.emoji;
@@ -481,6 +507,15 @@ function gameLoop(currentTime) {
 }
 
 function update() {
+    // Проверка зажатия МегаБомбы (1 секунда)
+    if (rHeld && !rTriggered && !isPaused && (performance.now() - rPressTime > 1000)) {
+        if (player.grenades >= 100) {
+            player.grenades -= 100;
+            triggerMegaBomb();
+            rTriggered = true;
+        }
+    }
+
     let dx = 0, dy = 0;
     if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
     if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
@@ -507,7 +542,7 @@ function update() {
     }
     
     if (pet.active) {
-        let petMult = pet.level === 2 ? 5 : (pet.level === 1 ? 2 : 1);
+        let petMult = pet.level === 3 ? 10 : (pet.level === 2 ? 5 : (pet.level === 1 ? 2 : 1));
         let targetItem = null; let minDist = 500;
         
         for (let i of items) {
@@ -550,24 +585,56 @@ function update() {
 
     let stats = getWeaponStats();
     
-    if (stats.continuous && nearestZombie) {
-        let angle = Math.atan2(nearestZombie.y - player.y, nearestZombie.x - player.x);
-        player.laserData = { active: true, angle: angle, width: stats.width };
-        
-        let endX = player.x + Math.cos(angle) * 2000;
-        let endY = player.y + Math.sin(angle) * 2000;
-        
-        for(let z of zombies) {
-            let distToBeam = Math.sqrt(distToSegmentSquared(z, {x:player.x, y:player.y}, {x:endX, y:endY}));
-            if (distToBeam < (stats.width/2 + z.radius)) {
-                z.hp -= stats.damage;
-                if (z.hp <= 0 && !z.deadMark) z.deadMark = true;
+    // ЭВОЛЮЦИЯ ЛАЗЕРА
+    if (stats.continuous && zombies.length > 0) {
+        if (player.laserLevel >= 10) {
+            // КОЛЬЦЕВАЯ ВОЛНА (Ур. 10)
+            if (!player.laserData || player.laserData.type !== 'ring') {
+                player.laserData = { active: true, type: 'ring', width: stats.width, waveRadius: 0 };
+            }
+            player.laserData.active = true;
+            player.laserData.waveRadius += 15;
+            if (player.laserData.waveRadius > 1500) player.laserData.waveRadius = 0;
+            
+            let wRad = player.laserData.waveRadius;
+            for(let z of zombies) {
+                let dist = Math.hypot(z.x - player.x, z.y - player.y);
+                if (Math.abs(dist - wRad) < (stats.width/2 + z.radius + 15)) {
+                    z.hp -= stats.damage;
+                    if (z.hp <= 0 && !z.deadMark) z.deadMark = true;
+                }
+            }
+        } else {
+            // НЕЗАВИСИМЫЕ ЛУЧИ (Ур. 1-9)
+            let beamCount = 1;
+            if (player.laserLevel >= 9) beamCount = 9;
+            else if (player.laserLevel >= 6) beamCount = 6;
+            else if (player.laserLevel >= 3) beamCount = 3;
+
+            // Находим N ближайших зомби
+            let targets = zombies.slice().sort((a,b) => Math.hypot(a.x-player.x, a.y-player.y) - Math.hypot(b.x-player.x, b.y-player.y)).slice(0, beamCount);
+            let angles = targets.map(t => Math.atan2(t.y - player.y, t.x - player.x));
+            
+            player.laserData = { active: true, type: 'beams', angles: angles, width: stats.width };
+            
+            for(let angle of angles) {
+                let endX = player.x + Math.cos(angle) * 2000;
+                let endY = player.y + Math.sin(angle) * 2000;
+                
+                for(let z of zombies) {
+                    let distToBeam = Math.sqrt(distToSegmentSquared(z, {x:player.x, y:player.y}, {x:endX, y:endY}));
+                    if (distToBeam < (stats.width/2 + z.radius)) {
+                        z.hp -= stats.damage;
+                        if (z.hp <= 0 && !z.deadMark) z.deadMark = true;
+                    }
+                }
             }
         }
     } else if (stats.continuous) {
         player.laserData = { active: false };
     } 
     else {
+        // ОБЫЧНОЕ ОРУЖИЕ
         player.laserData = { active: false };
         if (player.shootCooldown > 0) player.shootCooldown--;
         if (player.shootCooldown === 0 && nearestZombie) {
@@ -715,14 +782,9 @@ function update() {
         }
     }
 
-    // ИСПРАВЛЕННЫЙ ПЕРЕХОД УРОВНЕЙ БЕЗ БАГОВ
     const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'laser_beam', 'pet_unlock', 'saw_upgrade', 'generic_boss_loot'];
     if (zombies.length === 0 && zombiesRemainingToSpawn === 0 && !items.some(i => bossLootTypes.includes(i.type))) {
-        if (waveIndex < waveBaseCounts.length) { 
-            waveIndex++; spawnWave(); 
-        } else { 
-            levelUp(); 
-        }
+        if (waveIndex < waveBaseCounts.length) { waveIndex++; spawnWave(); } else { levelUp(); }
     }
 }
 
@@ -738,7 +800,6 @@ function killZombie(z) {
     totalKills++; 
     
     if (z.type === 'boss') {
-        // Добавляем трофей в коллекцию
         player.trophies.push({ name: z.name, emoji: z.emoji || '💀' });
 
         if (currentLevel === 1) items.push({ type: 'machine_gun', x: z.x, y: z.y, radius: 25 });
@@ -755,7 +816,7 @@ function killZombie(z) {
     } else if (z.type === 'cyber') {
         if (Math.random() < 0.01) items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); 
     } else {
-        // Дефляция дропа на 5% (коэффициент 0.95), гранаты начинаются с 15% (0.15)
+        // Шанс гранат: старт 15%, угасает на 5% за каждый уровень
         let grenadeChance = 0.15 * Math.pow(0.95, Math.max(0, currentLevel - 1));
         let armorChance = 0.10 * Math.pow(0.9, Math.max(0, currentLevel - 3));
         let medkitChance = 0.05 * Math.pow(0.9, Math.max(0, currentLevel - 4));
@@ -771,7 +832,6 @@ function levelUp() { currentLevel++; waveIndex = 0; spawnWave(); }
 function updateUI() {
     if(!isGameRunning) return;
     
-    // ЛЕВАЯ ПАНЕЛЬ
     uiLevel.innerText = currentLevel;
     uiKills.innerText = totalKills;
     
@@ -791,7 +851,6 @@ function updateUI() {
     let armPerc = Math.max(0, (player.armor / player.maxArmor) * 100);
     uiArmorText.innerText = Math.round(player.armor); uiArmorBar.style.width = armPerc + '%';
     
-    // ПРАВАЯ ПАНЕЛЬ
     uiCoins.innerText = player.coins;
     
     if (player.weapon === 'laser_beam' && player.laserLevel < 10) {
@@ -803,10 +862,10 @@ function updateUI() {
         btnUpgradeLaser.style.display = 'none';
     }
     
-    if (pet.active && pet.level < 2) {
+    if (pet.active && pet.level < 3) {
         btnUpgradePet.style.display = 'block';
-        let cost = pet.level === 0 ? 1000 : 10000;
-        let nextMult = pet.level === 0 ? 'x2' : 'x5';
+        let cost = pet.level === 0 ? 1000 : (pet.level === 1 ? 10000 : 100000);
+        let nextMult = pet.level === 0 ? 'x2' : (pet.level === 1 ? 'x5' : 'x10');
         btnUpgradePet.innerText = `Питомец ${nextMult} (${cost})`;
         btnUpgradePet.style.opacity = player.coins >= cost ? '1' : '0.5';
     } else {
@@ -819,7 +878,6 @@ function updateUI() {
     let zombChance = currentLevel >= 28 ? Math.min(100, (currentLevel - 27) * 5) : 0;
     uiInfoZomb.innerText = zombChance + '%';
     
-    // Считаем актуальный шанс гранат (старт 15%, угасание 5%)
     let grenadeChance = (0.15 * Math.pow(0.95, Math.max(0, currentLevel - 1)) * 100).toFixed(2);
     uiInfoGrenade.innerText = grenadeChance + '%';
     
@@ -829,11 +887,10 @@ function updateUI() {
     let medkitChance = currentLevel >= 4 ? (0.05 * Math.pow(0.9, Math.max(0, currentLevel - 4)) * 100).toFixed(2) : 0;
     uiInfoMedkit.innerText = medkitChance + '%';
 
-    // ОТРИСОВКА ПАНЕЛИ ТРОФЕЕВ
     if (player.trophies && player.trophies.length !== lastTrophyCount) {
         lastTrophyCount = player.trophies.length;
         const bp = document.getElementById('bottomPanel');
-        bp.innerHTML = ''; // очищаем панель
+        bp.innerHTML = ''; 
         for (let t of player.trophies) {
             let el = document.createElement('div');
             el.className = 'trophy';
@@ -841,7 +898,6 @@ function updateUI() {
             el.innerText = t.emoji;
             bp.appendChild(el);
         }
-        // Автоскролл в конец, чтобы видеть новые трофеи
         bp.scrollLeft = bp.scrollWidth;
     }
 }
@@ -903,9 +959,15 @@ function draw() {
         }
     }
 
+    // Взрывы + МегаБомба
     for(let ex of explosions) {
-        ctx.fillStyle = `rgba(230, 126, 34, ${ex.life/10})`;
-        ctx.beginPath(); ctx.arc(ex.x - cameraX, ex.y - cameraY, ex.radius, 0, Math.PI*2); ctx.fill();
+        if (ex.isMega) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${ex.life/30})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        } else {
+            ctx.fillStyle = `rgba(230, 126, 34, ${ex.life/10})`;
+            ctx.beginPath(); ctx.arc(ex.x - cameraX, ex.y - cameraY, ex.radius, 0, Math.PI*2); ctx.fill();
+        }
     }
 
     for(let g of thrownGrenades) {
@@ -931,24 +993,42 @@ function draw() {
 
     if (player.weapon === 'laser_beam' && player.laserData && player.laserData.active) {
         let stats = getWeaponStats();
-        let endX = player.x + Math.cos(player.laserData.angle) * 2000;
-        let endY = player.y + Math.sin(player.laserData.angle) * 2000;
         
-        ctx.save();
-        ctx.strokeStyle = 'rgba(255, 0, 255, 0.6)'; 
-        ctx.lineWidth = stats.width;
-        ctx.shadowColor = '#ff00ff';
-        ctx.shadowBlur = 20;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(player.x - cameraX, player.y - cameraY);
-        ctx.lineTo(endX - cameraX, endY - cameraY);
-        ctx.stroke();
-        
-        ctx.strokeStyle = '#fff'; 
-        ctx.lineWidth = stats.width * 0.4;
-        ctx.stroke();
-        ctx.restore();
+        if (player.laserData.type === 'ring') {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 0, 255, 0.6)'; 
+            ctx.lineWidth = stats.width;
+            ctx.shadowColor = '#ff00ff';
+            ctx.shadowBlur = 20;
+            ctx.beginPath();
+            ctx.arc(player.x - cameraX, player.y - cameraY, player.laserData.waveRadius, 0, Math.PI*2);
+            ctx.stroke();
+            ctx.strokeStyle = '#fff'; 
+            ctx.lineWidth = stats.width * 0.4;
+            ctx.stroke();
+            ctx.restore();
+        } else if (player.laserData.type === 'beams' && player.laserData.angles) {
+            for(let angle of player.laserData.angles) {
+                let endX = player.x + Math.cos(angle) * 2000;
+                let endY = player.y + Math.sin(angle) * 2000;
+                
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 0, 255, 0.6)'; 
+                ctx.lineWidth = stats.width;
+                ctx.shadowColor = '#ff00ff';
+                ctx.shadowBlur = 20;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(player.x - cameraX, player.y - cameraY);
+                ctx.lineTo(endX - cameraX, endY - cameraY);
+                ctx.stroke();
+                
+                ctx.strokeStyle = '#fff'; 
+                ctx.lineWidth = stats.width * 0.4;
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
     }
 
     for (let b of bullets) {
@@ -1006,8 +1086,8 @@ function draw() {
     ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.arc(0, 0, player.radius, 0, Math.PI*2); ctx.fill();
     
     let targetAngle = 0;
-    if (player.laserData && player.laserData.active) {
-        targetAngle = player.laserData.angle;
+    if (player.laserData && player.laserData.active && player.laserData.type === 'beams' && player.laserData.angles && player.laserData.angles.length > 0) {
+        targetAngle = player.laserData.angles[0]; // Пушка смотрит по первому лучу
     } else {
         let target = zombies.reduce((acc, curr) => Math.hypot(curr.x-player.x, curr.y-player.y) < Math.hypot(acc.x-player.x, acc.y-player.y) ? curr : acc, {x: Infinity, y: Infinity});
         if (zombies.length > 0) targetAngle = Math.atan2(target.y - player.y, target.x - player.x);
