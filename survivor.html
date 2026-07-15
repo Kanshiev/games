@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 9.0 (ZomboTanks)</title>
+    <title>Survivor.io - Alpha 9.1 (Magnet Optimization)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -59,7 +59,6 @@
         .hp-bar { height: 100%; background: #2ecc71; width: 100%; transition: width 0.2s; }
         .armor-bar { height: 100%; background: #3498db; width: 0%; transition: width 0.2s; }
 
-        /* Панель трофеев */
         #bottomPanel {
             width: 100%; max-width: 1280px; height: 75px; background: #1a1a1a;
             border: 4px solid #333; margin-top: 15px; border-radius: 8px;
@@ -72,7 +71,6 @@
         }
         .trophy:hover { transform: scale(1.1); }
         
-        /* Стили для скроллбара */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #111; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
@@ -83,7 +81,6 @@
 
 <div id="mainApp">
     <div id="gameWrapper">
-        <!-- ЛЕВАЯ ПАНЕЛЬ -->
         <div id="leftPanel" class="side-panel">
             <h2>СТАТУС</h2>
             <div class="stat-box">
@@ -126,7 +123,6 @@
             <button id="btnLoad" class="btn" style="background-color: #27ae60; padding: 8px;">Загрузить</button>
         </div>
 
-        <!-- ИГРОВОЕ ПОЛЕ -->
         <div id="gameContainer">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <div id="screenOverlay" class="overlay active">
@@ -136,7 +132,6 @@
             </div>
         </div>
 
-        <!-- ПРАВАЯ ПАНЕЛЬ -->
         <div id="rightPanel" class="side-panel">
             <h2>ПРОКАЧКА</h2>
             <div class="stat-box">
@@ -147,6 +142,10 @@
             <button id="btnUpgradePet" class="btn btn-upgrade" style="margin-top: 0; margin-bottom: 20px;">Улучшить Питомца</button>
             
             <h2>ИНФО ОБ ИГРЕ</h2>
+            <div class="stat-box">
+                <div class="stat-label">РАДИУС СТЯЖАТЕЛЬСТВА</div>
+                <div class="stat-value" id="uiInfoMagnet" style="color: #9b59b6;">0px</div>
+            </div>
             <div class="stat-box">
                 <div class="stat-label">КИБЕРЗОМБИ В ВОЛНЕ</div>
                 <div class="stat-value" id="uiInfoCyber">0%</div>
@@ -163,22 +162,9 @@
                 <div class="stat-label">ДРОП ГРАНАТ</div>
                 <div class="stat-value" id="uiInfoGrenade" style="color: #e67e22;">15.00%</div>
             </div>
-            <div class="stat-box">
-                <div class="stat-label">ДРОП БРОНИ</div>
-                <div class="stat-value" id="uiInfoArmor" style="color: #3498db;">0.00%</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">ДРОП АПТЕЧЕК</div>
-                <div class="stat-value" id="uiInfoMedkit" style="color: #e74c3c;">0.00%</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">ДРОП МОНЕТ</div>
-                <div class="stat-value" style="color: #f1c40f; font-size: 0.75rem">1% (Кибер)<br>100% 1шт (Зомбонатор)<br>100% 10шт (Танк)</div>
-            </div>
         </div>
     </div>
     
-    <!-- ПАНЕЛЬ ТРОФЕЕВ БОССОВ -->
     <div id="bottomPanel"></div>
 </div>
 
@@ -206,12 +192,11 @@ const uiArmorBar = document.getElementById('uiArmorBar');
 const uiCoins = document.getElementById('uiCoins');
 const btnUpgradeLaser = document.getElementById('btnUpgradeLaser');
 const btnUpgradePet = document.getElementById('btnUpgradePet');
+const uiInfoMagnet = document.getElementById('uiInfoMagnet');
 const uiInfoCyber = document.getElementById('uiInfoCyber');
 const uiInfoZomb = document.getElementById('uiInfoZomb');
 const uiInfoTank = document.getElementById('uiInfoTank');
 const uiInfoGrenade = document.getElementById('uiInfoGrenade');
-const uiInfoArmor = document.getElementById('uiInfoArmor');
-const uiInfoMedkit = document.getElementById('uiInfoMedkit');
 
 const WORLD_WIDTH = 3000;
 const WORLD_HEIGHT = 3000;
@@ -223,7 +208,6 @@ let bullets = []; let zombies = []; let enemyProjectiles = []; let acidPools = [
 let thrownGrenades = []; let explosions = []; 
 let keys = {};
 
-// Управление МегаБомбой
 let rHeld = false;
 let rTriggered = false;
 let rPressTime = 0;
@@ -323,6 +307,7 @@ function loadGame() {
     if (pet.level === undefined) pet.level = 0; 
     if (player.coins === undefined) player.coins = 0;
     if (player.laserLevel === undefined) player.laserLevel = 0;
+    if (player.magnetRadius === undefined) player.magnetRadius = 0;
     if (player.trophies === undefined) player.trophies = [];
     player.laserData = { active: false };
     
@@ -340,7 +325,7 @@ function initGame() {
         x: WORLD_WIDTH/2, y: WORLD_HEIGHT/2, radius: 16, speed: 4, hp: 100, maxHp: 100, 
         armor: 0, maxArmor: 100, grenades: 0, coins: 0, shootCooldown: 0, weapon: 'pistol', 
         hasSaws: false, sawAngle: 0, sawCount: 3, sawRadius: 60, laserLevel: 0, laserData: {active: false},
-        trophies: []
+        magnetRadius: 0, trophies: []
     };
     pet = { active: false, x: player.x, y: player.y, angle: 0, level: 0 };
     bullets = []; zombies = []; enemyProjectiles = []; acidPools = []; items = []; thrownGrenades = []; explosions = [];
@@ -541,6 +526,7 @@ function update() {
         for (let i = 0; i < spawnCount; i++) { spawnEnemy('normal'); zombiesRemainingToSpawn--; }
     }
 
+    // Пилы
     if (player.hasSaws) {
         player.sawAngle += 0.05;
         const orbitRadius = player.sawRadius || 60;
@@ -551,6 +537,22 @@ function update() {
         }
     }
     
+    // Эффект магнита (Стяжательство)
+    if (player.magnetRadius > 0) {
+        for (let i = items.length - 1; i >= 0; i--) {
+            let item = items[i];
+            if (item.type === 'coin' || item.type === 'player_grenade_pickup') {
+                let distToPlayer = Math.hypot(item.x - player.x, item.y - player.y);
+                if (distToPlayer <= player.magnetRadius) {
+                    let pAngle = Math.atan2(player.y - item.y, player.x - item.x);
+                    item.x += Math.cos(pAngle) * 30; // Мощный прилет лута
+                    item.y += Math.sin(pAngle) * 30;
+                }
+            }
+        }
+    }
+
+    // Питомец
     if (pet.active) {
         let petMult = pet.level === 3 ? 10 : (pet.level === 2 ? 5 : (pet.level === 1 ? 2 : 1));
         let targetItem = null; let minDist = 500;
@@ -780,6 +782,7 @@ function update() {
         if (Math.hypot(player.x - z.x, player.y - z.y) < player.radius + z.radius) { takeDamage(z.type === 'boss' ? 0.5 : 0.1); }
     }
 
+    // Подбор предметов (для игрока, если магнит отключен или предмет далеко)
     for (let i = items.length - 1; i >= 0; i--) {
         let item = items[i];
         if (Math.hypot(item.x - player.x, item.y - player.y) < player.radius + item.radius) {
@@ -790,6 +793,7 @@ function update() {
             else if (item.type === 'plasma_cutter') { player.weapon = 'plasma_cutter'; levelUp(); }
             else if (item.type === 'laser_beam') { player.weapon = 'laser_beam'; levelUp(); }
             else if (item.type === 'pet_unlock') { pet.active = true; pet.x = player.x; pet.y = player.y; pet.level = pet.level || 0; levelUp(); }
+            else if (item.type === 'magnet_upgrade') { player.magnetRadius = (player.magnetRadius || 0) + 100; levelUp(); }
             else if (item.type === 'saw_upgrade') { player.sawCount = (player.sawCount || 3) + 1; player.sawRadius = (player.sawRadius || 60) + 10; levelUp(); }
             else if (item.type === 'generic_boss_loot') { levelUp(); }
             else if (item.type === 'armor_shard') player.armor = Math.min(player.maxArmor, player.armor + (player.maxArmor * 0.1));
@@ -801,7 +805,7 @@ function update() {
         }
     }
 
-    const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'laser_beam', 'pet_unlock', 'saw_upgrade', 'generic_boss_loot'];
+    const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'laser_beam', 'pet_unlock', 'saw_upgrade', 'magnet_upgrade', 'generic_boss_loot'];
     if (zombies.length === 0 && zombiesRemainingToSpawn === 0 && !items.some(i => bossLootTypes.includes(i.type))) {
         if (waveIndex < waveBaseCounts.length) { waveIndex++; spawnWave(); } else { levelUp(); }
     }
@@ -828,6 +832,7 @@ function killZombie(z) {
         else if (currentLevel === 13) items.push({ type: 'plasma_cutter', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel === 18) items.push({ type: 'laser_beam', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel === 25) items.push({ type: 'pet_unlock', x: z.x, y: z.y, radius: 25 });
+        else if (currentLevel >= 35) items.push({ type: 'magnet_upgrade', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel > 10 && currentLevel !== 18 && currentLevel !== 25) items.push({ type: 'saw_upgrade', x: z.x, y: z.y, radius: 25 });
         else items.push({ type: 'generic_boss_loot', x: z.x, y: z.y, radius: 25 });
     } else if (z.type === 'zombotank') {
@@ -900,6 +905,8 @@ function updateUI() {
         btnUpgradePet.style.display = 'none';
     }
     
+    uiInfoMagnet.innerText = (player.magnetRadius || 0) + 'px';
+    
     let cyberChance = currentLevel >= 19 ? Math.min(100, (currentLevel - 18) * 5) : 0;
     uiInfoCyber.innerText = cyberChance + '%';
     
@@ -954,6 +961,17 @@ function draw() {
         ctx.beginPath(); ctx.arc(p.x - cameraX, p.y - cameraY, p.radius, 0, Math.PI*2); ctx.fill();
     }
 
+    // Отрисовка радиуса магнита (слабо видимый круг вокруг игрока)
+    if (player.magnetRadius && player.magnetRadius > 0) {
+        ctx.fillStyle = 'rgba(52, 152, 219, 0.05)';
+        ctx.strokeStyle = 'rgba(52, 152, 219, 0.2)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(player.x - cameraX, player.y - cameraY, player.magnetRadius, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+    }
+
     for (let item of items) {
         ctx.save(); ctx.translate(item.x - cameraX, item.y - cameraY);
         if (item.type === 'machine_gun') { ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); } 
@@ -964,6 +982,7 @@ function draw() {
         else if (item.type === 'laser_beam') { ctx.fillStyle = '#ff00ff'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'pet_unlock') { ctx.fillStyle = '#e67e22'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'saw_upgrade') { ctx.fillStyle = '#ff4757'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
+        else if (item.type === 'magnet_upgrade') { ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'generic_boss_loot') { ctx.fillStyle = '#bdc3c7'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'armor_shard') { ctx.fillStyle = '#85c1e9'; ctx.beginPath(); ctx.arc(0, 0, item.radius, 0, Math.PI*2); ctx.fill(); }
         else if (item.type === 'coin') {
@@ -980,10 +999,11 @@ function draw() {
         }
         ctx.restore();
         
-        const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'laser_beam', 'pet_unlock', 'saw_upgrade', 'generic_boss_loot'];
+        const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'laser_beam', 'pet_unlock', 'saw_upgrade', 'magnet_upgrade', 'generic_boss_loot'];
         if (bossLootTypes.includes(item.type)) {
             ctx.fillStyle = '#fff'; ctx.font = '14px Arial'; ctx.textAlign = 'center';
             if (item.type === 'saw_upgrade') ctx.fillText("+1 К СТРАЖУ!", item.x - cameraX, item.y - cameraY - 30);
+            else if (item.type === 'magnet_upgrade') ctx.fillText("СТЯЖАТЕЛЬСТВО!", item.x - cameraX, item.y - cameraY - 30);
             else if (item.type === 'pet_unlock') ctx.fillText("ПИТОМЕЦ!", item.x - cameraX, item.y - cameraY - 30);
             else if (item.type === 'laser_beam') ctx.fillText("ЛАЗЕР!", item.x - cameraX, item.y - cameraY - 30);
             else ctx.fillText("ЛУТ!", item.x - cameraX, item.y - cameraY - 30);
