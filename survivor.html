@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 8.0 (MegaBomb & Laser Evolution)</title>
+    <title>Survivor.io - Alpha 8.1 (Pet Fix)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -394,7 +394,6 @@ function triggerMegaBomb() {
         z.hp = 0;
         if(!z.deadMark) z.deadMark = true;
     }
-    // Огромная белая вспышка на весь экран
     explosions.push({x: player.x, y: player.y, radius: 2000, life: 30, isMega: true});
 }
 
@@ -479,6 +478,7 @@ function spawnEnemy(type) {
             35: {name: "ФИНАЛЬНЫЙ БОСС КАЧАЛКИ", hp: 1000000, rad: 65, speed: 1.0, emoji: "🏋️"}
         };
         let conf = bossConfigs[currentLevel] || {name: `СВЕРХМУТАНТ УР. ${currentLevel}`, hp: Math.max(1000, 35000 + (currentLevel - 15) * 8000), rad: 45, speed: 1.0, emoji: "👽"};
+        
         boss.name = conf.name; boss.radius = conf.rad; boss.speed = conf.speed; 
         boss.hp = conf.hp; boss.maxHp = conf.hp; boss.bossType = conf.bType || 'generic';
         boss.emoji = conf.emoji;
@@ -507,7 +507,6 @@ function gameLoop(currentTime) {
 }
 
 function update() {
-    // Проверка зажатия МегаБомбы (1 секунда)
     if (rHeld && !rTriggered && !isPaused && (performance.now() - rPressTime > 1000)) {
         if (player.grenades >= 100) {
             player.grenades -= 100;
@@ -552,24 +551,37 @@ function update() {
             }
         }
         
+        let step = player.speed * 1.5 * petMult;
+
         if (targetItem) {
-            let pAngle = Math.atan2(targetItem.y - pet.y, targetItem.x - pet.x);
-            pet.x += Math.cos(pAngle) * player.speed * 1.5 * petMult;
-            pet.y += Math.sin(pAngle) * player.speed * 1.5 * petMult;
+            let distToItem = Math.hypot(targetItem.x - pet.x, targetItem.y - pet.y);
+            if (distToItem <= step) {
+                pet.x = targetItem.x;
+                pet.y = targetItem.y;
+            } else {
+                let pAngle = Math.atan2(targetItem.y - pet.y, targetItem.x - pet.x);
+                pet.x += Math.cos(pAngle) * step;
+                pet.y += Math.sin(pAngle) * step;
+            }
         } else {
             pet.angle += 0.03 * petMult;
             let orbitX = player.x + Math.cos(pet.angle) * 80;
             let orbitY = player.y + Math.sin(pet.angle) * 80;
             let pAngle = Math.atan2(orbitY - pet.y, orbitX - pet.x);
-            if (Math.hypot(orbitX - pet.x, orbitY - pet.y) > 5) {
-                pet.x += Math.cos(pAngle) * player.speed * petMult;
-                pet.y += Math.sin(pAngle) * player.speed * petMult;
+            let distToOrbit = Math.hypot(orbitX - pet.x, orbitY - pet.y);
+            
+            if (distToOrbit <= step) {
+                pet.x = orbitX;
+                pet.y = orbitY;
+            } else {
+                pet.x += Math.cos(pAngle) * step;
+                pet.y += Math.sin(pAngle) * step;
             }
         }
         
         for (let i = items.length - 1; i >= 0; i--) {
             let item = items[i];
-            if ((item.type === 'coin' || item.type === 'player_grenade_pickup') && Math.hypot(item.x - pet.x, item.y - pet.y) < 25) {
+            if ((item.type === 'coin' || item.type === 'player_grenade_pickup') && Math.hypot(item.x - pet.x, item.y - pet.y) < 40) {
                 if (item.type === 'coin') player.coins++;
                 if (item.type === 'player_grenade_pickup') player.grenades++;
                 items.splice(i, 1);
@@ -588,7 +600,6 @@ function update() {
     // ЭВОЛЮЦИЯ ЛАЗЕРА
     if (stats.continuous && zombies.length > 0) {
         if (player.laserLevel >= 10) {
-            // КОЛЬЦЕВАЯ ВОЛНА (Ур. 10)
             if (!player.laserData || player.laserData.type !== 'ring') {
                 player.laserData = { active: true, type: 'ring', width: stats.width, waveRadius: 0 };
             }
@@ -605,13 +616,11 @@ function update() {
                 }
             }
         } else {
-            // НЕЗАВИСИМЫЕ ЛУЧИ (Ур. 1-9)
             let beamCount = 1;
             if (player.laserLevel >= 9) beamCount = 9;
             else if (player.laserLevel >= 6) beamCount = 6;
             else if (player.laserLevel >= 3) beamCount = 3;
 
-            // Находим N ближайших зомби
             let targets = zombies.slice().sort((a,b) => Math.hypot(a.x-player.x, a.y-player.y) - Math.hypot(b.x-player.x, b.y-player.y)).slice(0, beamCount);
             let angles = targets.map(t => Math.atan2(t.y - player.y, t.x - player.x));
             
@@ -634,7 +643,6 @@ function update() {
         player.laserData = { active: false };
     } 
     else {
-        // ОБЫЧНОЕ ОРУЖИЕ
         player.laserData = { active: false };
         if (player.shootCooldown > 0) player.shootCooldown--;
         if (player.shootCooldown === 0 && nearestZombie) {
@@ -816,7 +824,6 @@ function killZombie(z) {
     } else if (z.type === 'cyber') {
         if (Math.random() < 0.01) items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); 
     } else {
-        // Шанс гранат: старт 15%, угасает на 5% за каждый уровень
         let grenadeChance = 0.15 * Math.pow(0.95, Math.max(0, currentLevel - 1));
         let armorChance = 0.10 * Math.pow(0.9, Math.max(0, currentLevel - 3));
         let medkitChance = 0.05 * Math.pow(0.9, Math.max(0, currentLevel - 4));
@@ -959,7 +966,6 @@ function draw() {
         }
     }
 
-    // Взрывы + МегаБомба
     for(let ex of explosions) {
         if (ex.isMega) {
             ctx.fillStyle = `rgba(255, 255, 255, ${ex.life/30})`;
@@ -1087,7 +1093,7 @@ function draw() {
     
     let targetAngle = 0;
     if (player.laserData && player.laserData.active && player.laserData.type === 'beams' && player.laserData.angles && player.laserData.angles.length > 0) {
-        targetAngle = player.laserData.angles[0]; // Пушка смотрит по первому лучу
+        targetAngle = player.laserData.angles[0]; 
     } else {
         let target = zombies.reduce((acc, curr) => Math.hypot(curr.x-player.x, curr.y-player.y) < Math.hypot(acc.x-player.x, acc.y-player.y) ? curr : acc, {x: Infinity, y: Infinity});
         if (zombies.length > 0) targetAngle = Math.atan2(target.y - player.y, target.x - player.x);
