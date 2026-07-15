@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 6.5 (Pet Upgrades)</title>
+    <title>Survivor.io - Alpha 7.0 (Boss Trophies & Fixes)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -11,6 +11,10 @@
             font-family: 'Courier New', Courier, monospace;
             display: flex; align-items: center; justify-content: center;
             min-height: 100vh; overflow: hidden; user-select: none;
+        }
+        #mainApp {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 100%;
         }
         #gameWrapper {
             display: flex;
@@ -54,97 +58,124 @@
         .bar-bg { width: 100%; height: 15px; background: #555; border-radius: 3px; overflow: hidden; margin-top: 5px;}
         .hp-bar { height: 100%; background: #2ecc71; width: 100%; transition: width 0.2s; }
         .armor-bar { height: 100%; background: #3498db; width: 0%; transition: width 0.2s; }
+
+        /* Панель трофеев */
+        #bottomPanel {
+            width: 100%; max-width: 1280px; height: 75px; background: #1a1a1a;
+            border: 4px solid #333; margin-top: 15px; border-radius: 8px;
+            display: flex; align-items: center; overflow-x: auto; padding: 0 10px; box-sizing: border-box; gap: 10px;
+        }
+        .trophy {
+            min-width: 50px; height: 50px; background: #2c3e50; border: 2px solid #f1c40f;
+            border-radius: 5px; display: flex; justify-content: center; align-items: center;
+            font-size: 24px; cursor: help; transition: transform 0.2s;
+        }
+        .trophy:hover { transform: scale(1.1); }
+        
+        /* Стили для скроллбара */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
     </style>
 </head>
 <body>
 
-<div id="gameWrapper">
-    <div id="leftPanel" class="side-panel">
-        <h2>СТАТУС</h2>
-        <div class="stat-box">
-            <div class="stat-label">УРОВЕНЬ</div>
-            <div class="stat-value" id="uiLevel">1</div>
+<div id="mainApp">
+    <div id="gameWrapper">
+        <!-- ЛЕВАЯ ПАНЕЛЬ -->
+        <div id="leftPanel" class="side-panel">
+            <h2>СТАТУС</h2>
+            <div class="stat-box">
+                <div class="stat-label">УРОВЕНЬ</div>
+                <div class="stat-value" id="uiLevel">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ВОЛНА</div>
+                <div class="stat-value">
+                    <span id="uiWave">1 / 5</span> 
+                    <span class="stat-subtext" id="uiWaveLeft"></span>
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">УБИТО ЗОМБИ</div>
+                <div class="stat-value" id="uiKills" style="color: #2ecc71;">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ОРУЖИЕ</div>
+                <div class="stat-value" id="uiWeapon" style="color: #f1c40f;">Пистолет</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ГРАНАТЫ (R)</div>
+                <div class="stat-value" id="uiGrenades" style="color: #e67e22;">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ЗДОРОВЬЕ: <span id="uiHpText">100</span></div>
+                <div class="bar-bg"><div id="uiHpBar" class="hp-bar"></div></div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">БРОНЯ: <span id="uiArmorText">0</span></div>
+                <div class="bar-bg"><div id="uiArmorBar" class="armor-bar"></div></div>
+            </div>
+            
+            <div style="flex-grow: 1;"></div>
+            <div style="color: #888; font-size: 0.75rem; margin-bottom: 10px;">WASD: Движение<br>R: Гранаты<br>P: Пауза</div>
+            <button id="btnSpeed" class="btn" style="background-color: #8e44ad; padding: 8px;">Скорость: x1</button>
+            <button id="btnPause" class="btn" style="background-color: #f39c12; padding: 8px;">Пауза (P)</button>
+            <button id="btnSave" class="btn" style="background-color: #2980b9; padding: 8px;">Сохранить</button>
+            <button id="btnLoad" class="btn" style="background-color: #27ae60; padding: 8px;">Загрузить</button>
         </div>
-        <div class="stat-box">
-            <div class="stat-label">ВОЛНА</div>
-            <div class="stat-value">
-                <span id="uiWave">1 / 5</span> 
-                <span class="stat-subtext" id="uiWaveLeft"></span>
+
+        <!-- ИГРОВОЕ ПОЛЕ -->
+        <div id="gameContainer">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <div id="screenOverlay" class="overlay active">
+                <h1 id="overlayTitle">Wasteland Survivor</h1>
+                <p id="overlayDesc" style="color: #ccc;">Готовься к боли.</p>
+                <button id="actionBtn" class="btn" style="width: auto; padding: 15px 40px; font-size: 1.2rem;">Начать игру</button>
             </div>
         </div>
-        <div class="stat-box">
-            <div class="stat-label">УБИТО ЗОМБИ</div>
-            <div class="stat-value" id="uiKills" style="color: #2ecc71;">0</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">ОРУЖИЕ</div>
-            <div class="stat-value" id="uiWeapon" style="color: #f1c40f;">Пистолет</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">ГРАНАТЫ (R)</div>
-            <div class="stat-value" id="uiGrenades" style="color: #e67e22;">0</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">ЗДОРОВЬЕ: <span id="uiHpText">100</span></div>
-            <div class="bar-bg"><div id="uiHpBar" class="hp-bar"></div></div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">БРОНЯ: <span id="uiArmorText">0</span></div>
-            <div class="bar-bg"><div id="uiArmorBar" class="armor-bar"></div></div>
-        </div>
-        
-        <div style="flex-grow: 1;"></div>
-        <div style="color: #888; font-size: 0.75rem; margin-bottom: 10px;">WASD: Движение<br>R: Гранаты<br>P: Пауза</div>
-        <button id="btnSpeed" class="btn" style="background-color: #8e44ad; padding: 8px;">Скорость: x1</button>
-        <button id="btnPause" class="btn" style="background-color: #f39c12; padding: 8px;">Пауза (P)</button>
-        <button id="btnSave" class="btn" style="background-color: #2980b9; padding: 8px;">Сохранить</button>
-        <button id="btnLoad" class="btn" style="background-color: #27ae60; padding: 8px;">Загрузить</button>
-    </div>
 
-    <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <div id="screenOverlay" class="overlay active">
-            <h1 id="overlayTitle">Wasteland Survivor</h1>
-            <p id="overlayDesc" style="color: #ccc;">Готовься к боли.</p>
-            <button id="actionBtn" class="btn" style="width: auto; padding: 15px 40px; font-size: 1.2rem;">Начать игру</button>
+        <!-- ПРАВАЯ ПАНЕЛЬ -->
+        <div id="rightPanel" class="side-panel">
+            <h2>ПРОКАЧКА</h2>
+            <div class="stat-box">
+                <div class="stat-label">ЗОЛОТЫЕ МОНЕТЫ</div>
+                <div class="stat-value" id="uiCoins" style="color: #f1c40f;">0</div>
+            </div>
+            <button id="btnUpgradeLaser" class="btn btn-upgrade" style="margin-top: 0; margin-bottom: 10px;">Улучшить Лазер</button>
+            <button id="btnUpgradePet" class="btn btn-upgrade" style="margin-top: 0; margin-bottom: 20px;">Улучшить Питомца</button>
+            
+            <h2>ИНФО ОБ ИГРЕ</h2>
+            <div class="stat-box">
+                <div class="stat-label">КИБЕРЗОМБИ В ВОЛНЕ</div>
+                <div class="stat-value" id="uiInfoCyber">0%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ЗОМБОНАТОРЫ В ВОЛНЕ</div>
+                <div class="stat-value" id="uiInfoZomb" style="color: #e74c3c;">0%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ДРОП ГРАНАТ</div>
+                <div class="stat-value" id="uiInfoGrenade" style="color: #e67e22;">15.00%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ДРОП БРОНИ</div>
+                <div class="stat-value" id="uiInfoArmor" style="color: #3498db;">0.00%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ДРОП АПТЕЧЕК</div>
+                <div class="stat-value" id="uiInfoMedkit" style="color: #e74c3c;">0.00%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ДРОП МОНЕТ</div>
+                <div class="stat-value" style="color: #f1c40f; font-size: 0.8rem">1% (Кибер)<br>100% (Зомбонатор)</div>
+            </div>
         </div>
     </div>
-
-    <div id="rightPanel" class="side-panel">
-        <h2>ПРОКАЧКА</h2>
-        <div class="stat-box">
-            <div class="stat-label">ЗОЛОТЫЕ МОНЕТЫ</div>
-            <div class="stat-value" id="uiCoins" style="color: #f1c40f;">0</div>
-        </div>
-        <button id="btnUpgradeLaser" class="btn btn-upgrade" style="margin-top: 0; margin-bottom: 10px;">Улучшить Лазер</button>
-        <button id="btnUpgradePet" class="btn btn-upgrade" style="margin-top: 0; margin-bottom: 20px;">Улучшить Питомца</button>
-        
-        <h2>ИНФО ОБ ИГРЕ</h2>
-        <div class="stat-box">
-            <div class="stat-label">КИБЕРЗОМБИ В ВОЛНЕ</div>
-            <div class="stat-value" id="uiInfoCyber">0%</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">ЗОМБОНАТОРЫ В ВОЛНЕ</div>
-            <div class="stat-value" id="uiInfoZomb" style="color: #e74c3c;">0%</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">ДРОП ГРАНАТ</div>
-            <div class="stat-value" id="uiInfoGrenade" style="color: #e67e22;">2.00%</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">ДРОП БРОНИ</div>
-            <div class="stat-value" id="uiInfoArmor" style="color: #3498db;">0.00%</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">ДРОП АПТЕЧЕК</div>
-            <div class="stat-value" id="uiInfoMedkit" style="color: #e74c3c;">0.00%</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-label">ДРОП МОНЕТ</div>
-            <div class="stat-value" style="color: #f1c40f; font-size: 0.8rem">1% (Кибер)<br>100% (Зомбонатор)</div>
-        </div>
-    </div>
+    
+    <!-- ПАНЕЛЬ ТРОФЕЕВ БОССОВ -->
+    <div id="bottomPanel"></div>
 </div>
 
 <script>
@@ -190,6 +221,7 @@ let currentLevel = 1; let waveIndex = 0; let totalKills = 0;
 let zombiesRemainingToSpawn = 0; 
 let isGameRunning = false; let isPaused = false;
 let gameSpeed = 1;
+let lastTrophyCount = 0; // Для оптимизации отрисовки трофеев
 
 const waveBaseCounts = [15, 25, 40, 70, 120];
 
@@ -210,6 +242,7 @@ actionBtn.addEventListener('click', () => initGame());
 document.getElementById('btnSave').addEventListener('click', saveGame);
 document.getElementById('btnLoad').addEventListener('click', loadGame);
 document.getElementById('btnPause').addEventListener('click', togglePause);
+
 document.getElementById('btnSpeed').addEventListener('click', () => {
     if (gameSpeed === 1) gameSpeed = 2;
     else if (gameSpeed === 2) gameSpeed = 3;
@@ -264,9 +297,10 @@ function loadGame() {
     
     player = parsed.player;
     pet = parsed.pet || { active: false, x: 0, y: 0, angle: 0, level: 0 };
-    if (pet.level === undefined) pet.level = 0; // На случай старых сохранений
+    if (pet.level === undefined) pet.level = 0; 
     if (player.coins === undefined) player.coins = 0;
     if (player.laserLevel === undefined) player.laserLevel = 0;
+    if (player.trophies === undefined) player.trophies = [];
     player.laserData = { active: false };
     
     currentLevel = parsed.currentLevel; waveIndex = parsed.waveIndex; totalKills = parsed.totalKills || 0;
@@ -281,12 +315,15 @@ function initGame() {
     player = {
         x: WORLD_WIDTH/2, y: WORLD_HEIGHT/2, radius: 16, speed: 4, hp: 100, maxHp: 100, 
         armor: 0, maxArmor: 100, grenades: 0, coins: 0, shootCooldown: 0, weapon: 'pistol', 
-        hasSaws: false, sawAngle: 0, sawCount: 3, sawRadius: 60, laserLevel: 0, laserData: {active: false}
+        hasSaws: false, sawAngle: 0, sawCount: 3, sawRadius: 60, laserLevel: 0, laserData: {active: false},
+        trophies: []
     };
     pet = { active: false, x: player.x, y: player.y, angle: 0, level: 0 };
     bullets = []; zombies = []; enemyProjectiles = []; acidPools = []; items = []; thrownGrenades = []; explosions = [];
-    keys = {}; currentLevel = 1; waveIndex = 0; zombiesRemainingToSpawn = 0; totalKills = 0;
+    keys = {}; currentLevel = 1; waveIndex = 0; zombiesRemainingToSpawn = 0; totalKills = 0; lastTrophyCount = 0;
     isGameRunning = true; isPaused = false;
+    
+    document.getElementById('bottomPanel').innerHTML = ''; // Очистка трофеев
     document.getElementById('btnPause').innerText = "Пауза (P)";
     overlay.classList.remove('active');
     spawnWave();
@@ -375,21 +412,50 @@ function spawnEnemy(type) {
         }
     } else if (type === 'boss') {
         let boss = { type: 'boss', x: zx, y: zy, timer: 0 };
+        // Полный список боссов от 1 до 35!
         const bossConfigs = {
-            1: {name: "ТОЛСТЯК", hp: 80, rad: 35, speed: 0.6},
-            2: {name: "ПЛЕВАЛЬЩИК", hp: 250, rad: 35, speed: 0.7, bType: 'spitter'},
-            3: {name: "БАРМАГЛОТ", hp: 800, rad: 45, speed: 0.8, bType: 'barmaglot'},
-            10: {name: "МЕХА-СТРАЖ", hp: 10000, rad: 50, speed: 0.9, bType: 'mecha'},
-            13: {name: "КАРЕН ИЗ БУХГАЛТЕРИИ", hp: 22000, rad: 42, speed: 1.0},
-            16: {name: "СКРАМ-МАСТЕР", hp: 45000, rad: 45, speed: 1.1},
-            17: {name: "БОСС-ВЕРТОЛЕТ", hp: 55000, rad: 45, speed: 1.3},
-            18: {name: "КВАНТОВЫЙ ДУШНИЛА", hp: 70000, rad: 48, speed: 0.8},
-            25: {name: "ПОВЕЛИТЕЛЬ ШЕРСТИ", hp: 150000, rad: 55, speed: 1.0},
-            28: {name: "СОЗДАТЕЛЬ ЗОМБОНАТОРОВ", hp: 250000, rad: 60, speed: 0.7}
+            1: {name: "ТОЛСТЯК", hp: 80, rad: 35, speed: 0.6, emoji: "🧟"},
+            2: {name: "ПЛЕВАЛЬЩИК", hp: 250, rad: 35, speed: 0.7, bType: 'spitter', emoji: "🤮"},
+            3: {name: "БАРМАГЛОТ", hp: 800, rad: 45, speed: 0.8, bType: 'barmaglot', emoji: "🐉"},
+            4: {name: "ТОКСИЧНЫЙ ТИМЛИД", hp: 1200, rad: 40, speed: 0.9, emoji: "🤬"},
+            5: {name: "КОУЧ УСПЕШНОГО УСПЕХА", hp: 1700, rad: 42, speed: 1.0, emoji: "📈"},
+            6: {name: "ДЕД ИНСАЙД", hp: 2300, rad: 35, speed: 1.2, emoji: "👴"},
+            7: {name: "КРОВАКРЫЛ", hp: 3500, rad: 30, speed: 1.8, bType: 'bloodwing', emoji: "🦇"},
+            8: {name: "БАТЯ С РЕМНЕМ", hp: 5000, rad: 40, speed: 1.3, emoji: "👨"},
+            9: {name: "САНТЕХНИК МИХАЛЫЧ", hp: 7000, rad: 45, speed: 0.8, emoji: "🔧"},
+            10: {name: "МЕХА-СТРАЖ", hp: 10000, rad: 50, speed: 0.9, bType: 'mecha', emoji: "🤖"},
+            11: {name: "БИЗНЕС-АНГЕЛ НА МЕРСЕ", hp: 13000, rad: 45, speed: 1.2, emoji: "💸"},
+            12: {name: "ДУШНЫЙ КОЛЛЕГА", hp: 17000, rad: 40, speed: 0.9, emoji: "🤓"},
+            13: {name: "КАРЕН ИЗ БУХГАЛТЕРИИ", hp: 22000, rad: 42, speed: 1.0, emoji: "👩‍💼"},
+            14: {name: "ИНФОЦЫГАН НА САМОКАТЕ", hp: 28000, rad: 38, speed: 1.5, emoji: "🛴"},
+            15: {name: "ГЕНДИРЕКТОР ОАО 'МРАК'", hp: 35000, rad: 52, speed: 1.0, emoji: "🕴️"},
+            16: {name: "СКРАМ-МАСТЕР", hp: 45000, rad: 45, speed: 1.1, emoji: "⏱️"},
+            17: {name: "БОСС-ВЕРТОЛЕТ", hp: 55000, rad: 45, speed: 1.3, emoji: "🚁"},
+            18: {name: "КВАНТОВЫЙ ДУШНИЛА", hp: 70000, rad: 48, speed: 0.8, emoji: "⚛️"},
+            19: {name: "ЗЛОЙ КУРЬЕР", hp: 85000, rad: 45, speed: 1.4, emoji: "🎒"},
+            20: {name: "МАМКИН КРИПТОИНВЕСТОР", hp: 100000, rad: 40, speed: 1.2, emoji: "🪙"},
+            21: {name: "АГРЕССИВНЫЙ ВЕГАН", hp: 120000, rad: 42, speed: 1.3, emoji: "🥦"},
+            22: {name: "БАБУШКА В ОЧЕРЕДИ", hp: 140000, rad: 38, speed: 0.7, emoji: "👵"},
+            23: {name: "ПРОДАВЕЦ ПЫЛЕСОСОВ", hp: 160000, rad: 45, speed: 1.5, emoji: "🧹"},
+            24: {name: "СОСЕД С ПЕРФОРАТОРОМ", hp: 180000, rad: 50, speed: 1.0, emoji: "🔨"},
+            25: {name: "ПОВЕЛИТЕЛЬ ШЕРСТИ", hp: 200000, rad: 55, speed: 1.0, emoji: "🐈"},
+            26: {name: "НЕУЛОВИМЫЙ ТАКСИСТ", hp: 230000, rad: 40, speed: 1.6, emoji: "🚕"},
+            27: {name: "ХМУРЫЙ ВАХТЕР", hp: 260000, rad: 45, speed: 0.6, emoji: "👮"},
+            28: {name: "СОЗДАТЕЛЬ ЗОМБОНАТОРОВ", hp: 300000, rad: 60, speed: 0.7, emoji: "⚙️"},
+            29: {name: "ФРИЛАНСЕР БЕЗ ДЕДЛАЙНОВ", hp: 350000, rad: 40, speed: 1.2, emoji: "💻"},
+            30: {name: "ГЛАВНЫЙ БУХГАЛТЕР", hp: 400000, rad: 50, speed: 0.9, emoji: "🧮"},
+            31: {name: "ПАРИКМАХЕР-КИНЕСТИК", hp: 450000, rad: 45, speed: 1.3, emoji: "✂️"},
+            32: {name: "МАСТЕР ПО РЕМОНТУ", hp: 500000, rad: 48, speed: 1.1, emoji: "🚪"},
+            33: {name: "БЕЗЖАЛОСТНЫЙ КОНДУКТОР", hp: 600000, rad: 45, speed: 1.4, emoji: "❄️"},
+            34: {name: "СВИДЕТЕЛЬ ИЕГОВЫ", hp: 750000, rad: 40, speed: 1.7, emoji: "🎫"},
+            35: {name: "ФИНАЛЬНЫЙ БОСС КАЧАЛКИ", hp: 1000000, rad: 65, speed: 1.0, emoji: "🏋️"}
         };
-        let conf = bossConfigs[currentLevel] || {name: `СВЕРХМУТАНТ УР. ${currentLevel}`, hp: 35000 + (currentLevel - 15) * 8000, rad: 45, speed: 1.0};
+        // Надежный фоллбек, чтобы ХП никогда не уходило в минус на случайжных уровнях
+        let conf = bossConfigs[currentLevel] || {name: `СВЕРХМУТАНТ УР. ${currentLevel}`, hp: Math.max(1000, 35000 + (currentLevel - 15) * 8000), rad: 45, speed: 1.0, emoji: "👽"};
+        
         boss.name = conf.name; boss.radius = conf.rad; boss.speed = conf.speed; 
         boss.hp = conf.hp; boss.maxHp = conf.hp; boss.bossType = conf.bType || 'generic';
+        boss.emoji = conf.emoji;
         zombies.push(boss);
     }
 }
@@ -649,9 +715,14 @@ function update() {
         }
     }
 
+    // ИСПРАВЛЕННЫЙ ПЕРЕХОД УРОВНЕЙ БЕЗ БАГОВ
     const bossLootTypes = ['machine_gun', 'armor_boss', 'minigun', 'saws', 'plasma_cutter', 'laser_beam', 'pet_unlock', 'saw_upgrade', 'generic_boss_loot'];
     if (zombies.length === 0 && zombiesRemainingToSpawn === 0 && !items.some(i => bossLootTypes.includes(i.type))) {
-        if (waveIndex < waveBaseCounts.length) { waveIndex++; spawnWave(); } else if (currentLevel === 3) { levelUp(); }
+        if (waveIndex < waveBaseCounts.length) { 
+            waveIndex++; spawnWave(); 
+        } else { 
+            levelUp(); 
+        }
     }
 }
 
@@ -667,6 +738,9 @@ function killZombie(z) {
     totalKills++; 
     
     if (z.type === 'boss') {
+        // Добавляем трофей в коллекцию
+        player.trophies.push({ name: z.name, emoji: z.emoji || '💀' });
+
         if (currentLevel === 1) items.push({ type: 'machine_gun', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel === 2) items.push({ type: 'armor_boss', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel === 7) items.push({ type: 'minigun', x: z.x, y: z.y, radius: 25 });
@@ -675,13 +749,14 @@ function killZombie(z) {
         else if (currentLevel === 18) items.push({ type: 'laser_beam', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel === 25) items.push({ type: 'pet_unlock', x: z.x, y: z.y, radius: 25 });
         else if (currentLevel > 10 && currentLevel !== 18 && currentLevel !== 25) items.push({ type: 'saw_upgrade', x: z.x, y: z.y, radius: 25 });
-        else if (currentLevel !== 3) items.push({ type: 'generic_boss_loot', x: z.x, y: z.y, radius: 25 });
+        else items.push({ type: 'generic_boss_loot', x: z.x, y: z.y, radius: 25 });
     } else if (z.type === 'zombonator') {
         items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); 
     } else if (z.type === 'cyber') {
         if (Math.random() < 0.01) items.push({ type: 'coin', x: z.x, y: z.y, radius: 10 }); 
     } else {
-        let grenadeChance = 0.15 * Math.pow(0.98, Math.max(0, currentLevel - 1));
+        // Дефляция дропа на 5% (коэффициент 0.95), гранаты начинаются с 15% (0.15)
+        let grenadeChance = 0.15 * Math.pow(0.95, Math.max(0, currentLevel - 1));
         let armorChance = 0.10 * Math.pow(0.9, Math.max(0, currentLevel - 3));
         let medkitChance = 0.05 * Math.pow(0.9, Math.max(0, currentLevel - 4));
         
@@ -744,7 +819,8 @@ function updateUI() {
     let zombChance = currentLevel >= 28 ? Math.min(100, (currentLevel - 27) * 5) : 0;
     uiInfoZomb.innerText = zombChance + '%';
     
-    let grenadeChance = (0.02 * Math.pow(0.9, Math.max(0, currentLevel - 1)) * 100).toFixed(2);
+    // Считаем актуальный шанс гранат (старт 15%, угасание 5%)
+    let grenadeChance = (0.15 * Math.pow(0.95, Math.max(0, currentLevel - 1)) * 100).toFixed(2);
     uiInfoGrenade.innerText = grenadeChance + '%';
     
     let armorChance = currentLevel >= 3 ? (0.10 * Math.pow(0.9, Math.max(0, currentLevel - 3)) * 100).toFixed(2) : 0;
@@ -752,6 +828,22 @@ function updateUI() {
     
     let medkitChance = currentLevel >= 4 ? (0.05 * Math.pow(0.9, Math.max(0, currentLevel - 4)) * 100).toFixed(2) : 0;
     uiInfoMedkit.innerText = medkitChance + '%';
+
+    // ОТРИСОВКА ПАНЕЛИ ТРОФЕЕВ
+    if (player.trophies && player.trophies.length !== lastTrophyCount) {
+        lastTrophyCount = player.trophies.length;
+        const bp = document.getElementById('bottomPanel');
+        bp.innerHTML = ''; // очищаем панель
+        for (let t of player.trophies) {
+            let el = document.createElement('div');
+            el.className = 'trophy';
+            el.title = t.name;
+            el.innerText = t.emoji;
+            bp.appendChild(el);
+        }
+        // Автоскролл в конец, чтобы видеть новые трофеи
+        bp.scrollLeft = bp.scrollWidth;
+    }
 }
 
 function draw() {
