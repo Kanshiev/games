@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survivor.io - Alpha 9.1 (Magnet Optimization)</title>
+    <title>Survivor.io - Alpha 9.2 (Full Restoration)</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -59,6 +59,7 @@
         .hp-bar { height: 100%; background: #2ecc71; width: 100%; transition: width 0.2s; }
         .armor-bar { height: 100%; background: #3498db; width: 0%; transition: width 0.2s; }
 
+        /* Панель трофеев */
         #bottomPanel {
             width: 100%; max-width: 1280px; height: 75px; background: #1a1a1a;
             border: 4px solid #333; margin-top: 15px; border-radius: 8px;
@@ -71,6 +72,7 @@
         }
         .trophy:hover { transform: scale(1.1); }
         
+        /* Стили для скроллбара */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #111; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
@@ -162,6 +164,18 @@
                 <div class="stat-label">ДРОП ГРАНАТ</div>
                 <div class="stat-value" id="uiInfoGrenade" style="color: #e67e22;">15.00%</div>
             </div>
+            <div class="stat-box">
+                <div class="stat-label">ДРОП БРОНИ</div>
+                <div class="stat-value" id="uiInfoArmor" style="color: #3498db;">0.00%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ДРОП АПТЕЧЕК</div>
+                <div class="stat-value" id="uiInfoMedkit" style="color: #e74c3c;">0.00%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ДРОП МОНЕТ</div>
+                <div class="stat-value" style="color: #f1c40f; font-size: 0.75rem">1% (Кибер)<br>100% 1шт (Зомбонатор)<br>100% 10шт (Танк)</div>
+            </div>
         </div>
     </div>
     
@@ -197,6 +211,8 @@ const uiInfoCyber = document.getElementById('uiInfoCyber');
 const uiInfoZomb = document.getElementById('uiInfoZomb');
 const uiInfoTank = document.getElementById('uiInfoTank');
 const uiInfoGrenade = document.getElementById('uiInfoGrenade');
+const uiInfoArmor = document.getElementById('uiInfoArmor');
+const uiInfoMedkit = document.getElementById('uiInfoMedkit');
 
 const WORLD_WIDTH = 3000;
 const WORLD_HEIGHT = 3000;
@@ -208,6 +224,7 @@ let bullets = []; let zombies = []; let enemyProjectiles = []; let acidPools = [
 let thrownGrenades = []; let explosions = []; 
 let keys = {};
 
+// Управление МегаБомбой
 let rHeld = false;
 let rTriggered = false;
 let rPressTime = 0;
@@ -437,6 +454,7 @@ function spawnEnemy(type) {
         }
     } else if (type === 'boss') {
         let boss = { type: 'boss', x: zx, y: zy, timer: 0 };
+        // ПОЛНОСТЬЮ ВОССТАНОВЛЕННЫЙ СПИСОК ИЗ 35 БОССОВ
         const bossConfigs = {
             1: {name: "ТОЛСТЯК", hp: 80, rad: 35, speed: 0.6, emoji: "🧟"},
             2: {name: "ПЛЕВАЛЬЩИК", hp: 250, rad: 35, speed: 0.7, bType: 'spitter', emoji: "🤮"},
@@ -475,6 +493,7 @@ function spawnEnemy(type) {
             35: {name: "ФИНАЛЬНЫЙ БОСС КАЧАЛКИ", hp: 1000000, rad: 65, speed: 1.0, emoji: "🏋️"}
         };
         let conf = bossConfigs[currentLevel] || {name: `СВЕРХМУТАНТ УР. ${currentLevel}`, hp: Math.max(1000, 35000 + (currentLevel - 15) * 8000), rad: 45, speed: 1.0, emoji: "👽"};
+        
         boss.name = conf.name; boss.radius = conf.rad; boss.speed = conf.speed; 
         boss.hp = conf.hp; boss.maxHp = conf.hp; boss.bossType = conf.bType || 'generic';
         boss.emoji = conf.emoji;
@@ -526,7 +545,6 @@ function update() {
         for (let i = 0; i < spawnCount; i++) { spawnEnemy('normal'); zombiesRemainingToSpawn--; }
     }
 
-    // Пилы
     if (player.hasSaws) {
         player.sawAngle += 0.05;
         const orbitRadius = player.sawRadius || 60;
@@ -537,7 +555,7 @@ function update() {
         }
     }
     
-    // Эффект магнита (Стяжательство)
+    // Эффект магнита
     if (player.magnetRadius > 0) {
         for (let i = items.length - 1; i >= 0; i--) {
             let item = items[i];
@@ -545,14 +563,13 @@ function update() {
                 let distToPlayer = Math.hypot(item.x - player.x, item.y - player.y);
                 if (distToPlayer <= player.magnetRadius) {
                     let pAngle = Math.atan2(player.y - item.y, player.x - item.x);
-                    item.x += Math.cos(pAngle) * 30; // Мощный прилет лута
+                    item.x += Math.cos(pAngle) * 30; 
                     item.y += Math.sin(pAngle) * 30;
                 }
             }
         }
     }
 
-    // Питомец
     if (pet.active) {
         let petMult = pet.level === 3 ? 10 : (pet.level === 2 ? 5 : (pet.level === 1 ? 2 : 1));
         let targetItem = null; let minDist = 500;
@@ -610,7 +627,6 @@ function update() {
 
     let stats = getWeaponStats();
     
-    // ЭВОЛЮЦИЯ ЛАЗЕРА
     if (stats.continuous && zombies.length > 0) {
         if (player.laserLevel >= 10) {
             if (!player.laserData || player.laserData.type !== 'ring') {
@@ -782,7 +798,6 @@ function update() {
         if (Math.hypot(player.x - z.x, player.y - z.y) < player.radius + z.radius) { takeDamage(z.type === 'boss' ? 0.5 : 0.1); }
     }
 
-    // Подбор предметов (для игрока, если магнит отключен или предмет далеко)
     for (let i = items.length - 1; i >= 0; i--) {
         let item = items[i];
         if (Math.hypot(item.x - player.x, item.y - player.y) < player.radius + item.radius) {
@@ -793,7 +808,7 @@ function update() {
             else if (item.type === 'plasma_cutter') { player.weapon = 'plasma_cutter'; levelUp(); }
             else if (item.type === 'laser_beam') { player.weapon = 'laser_beam'; levelUp(); }
             else if (item.type === 'pet_unlock') { pet.active = true; pet.x = player.x; pet.y = player.y; pet.level = pet.level || 0; levelUp(); }
-            else if (item.type === 'magnet_upgrade') { player.magnetRadius = (player.magnetRadius || 0) + 1100; levelUp(); }
+            else if (item.type === 'magnet_upgrade') { player.magnetRadius = (player.magnetRadius || 0) + 100; levelUp(); }
             else if (item.type === 'saw_upgrade') { player.sawCount = (player.sawCount || 3) + 1; player.sawRadius = (player.sawRadius || 60) + 10; levelUp(); }
             else if (item.type === 'generic_boss_loot') { levelUp(); }
             else if (item.type === 'armor_shard') player.armor = Math.min(player.maxArmor, player.armor + (player.maxArmor * 0.1));
@@ -961,7 +976,6 @@ function draw() {
         ctx.beginPath(); ctx.arc(p.x - cameraX, p.y - cameraY, p.radius, 0, Math.PI*2); ctx.fill();
     }
 
-    // Отрисовка радиуса магнита (слабо видимый круг вокруг игрока)
     if (player.magnetRadius && player.magnetRadius > 0) {
         ctx.fillStyle = 'rgba(52, 152, 219, 0.05)';
         ctx.strokeStyle = 'rgba(52, 152, 219, 0.2)';
