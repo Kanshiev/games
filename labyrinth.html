@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Протокол: Лабиринт</title>
+    <style>
+        body {
+            background-color: #111;
+            color: #eee;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        #ui {
+            margin-bottom: 10px;
+            font-size: 18px;
+            display: flex;
+            gap: 20px;
+        }
+        canvas {
+            border: 4px solid #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            background-color: #1a1a1a;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <div>Патроны: <span id="ammo">10</span></div>
+    <div>Врагов осталось: <span id="enemies">5</span></div>
+    <div id="status" style="color: #ff5555;"></div>
+</div>
+<canvas id="gameCanvas" width="600" height="600"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const GRID_SIZE = 15; // Размер лабиринта (должен быть нечетным)
+const CELL_SIZE = canvas.width / GRID_SIZE;
+
+// 1. Генерация лабиринта (DFS)
+let maze = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(1));
+
+function generateMaze(r, c) {
+    maze[r][c] = 0;
+    const dirs = [[0, 2], [0, -2], [2, 0], [-2, 0]].sort(() => Math.random() - 0.5);
+    
+    for (let [dr, dc] of dirs) {
+        let nr = r + dr, nc = c + dc;
+        if (nr > 0 && nr < GRID_SIZE - 1 && nc > 0 && nc < GRID_SIZE - 1 && maze[nr][nc] === 1) {
+            maze[r + dr/2][c + dc/2] = 0;
+            generateMaze(nr, nc);
+        }
+    }
+}
+generateMaze(1, 1);
+maze[GRID_SIZE-2][GRID_SIZE-2] = 0; // Гарантируем выход
+
+// Игрок
+const player = {
+    x: 1.5 * CELL_SIZE,
+    y: 1.5 * CELL_SIZE,
+    radius: CELL_SIZE * 0.3,
+    speed: 3,
+    ammo: 10,
+    lightRadius: CELL_SIZE * 2.5
+};
+
+// Поиск свободных клеток для спавна
+function getRandomEmptyCell() {
+    let cells = [];
+    for (let r = 1; r < GRID_SIZE - 1; r++) {
+        for (let c = 1; c < GRID_SIZE - 1; c++) {
+            if (maze[r][c] === 0 && !(r === 1 && c === 1)) {
+                cells.push({r, c});
+            }
+        }
+    }
+    return cells[Math.floor(Math.random() * cells.length)];
+}
+
+// Спавн обойм (2 штуки)
+const ammoClips = [];
+for (let i = 0; i < 2; i++) {
+    const cell = getRandomEmptyCell();
+    ammoClips.push({
+        x: (cell.c + 0.5) * CELL_SIZE,
+        y: (cell.r + 0.5) * CELL_SIZE,
+        collected: false
+    });
+}
+
+// Спавн врагов (5 штук)
+const enemies = [];
+for (let i = 0; i < 5; i++) {
+    const cell = getRandomEmptyCell();
+    enemies.push({
+        x: (cell.c + 0.5) * CELL_SIZE,
+        y: (cell.r + 0.5) * CELL_SIZE,
+        speed: 1,
+        alive: true,
+        hp: 1
+    });
+}
+
+// Пули
+const bullets = [];
+
+// Управление клавиатурой
+const keys = {};
+window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+// Стрельба по клику
+canvas.addEventListener('mousedown', e => {
+    if (player.ammo <= 0) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+    
+    bullets.push({
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(angle) * 7,
+        vy: Math.sin(angle) * 7
+    });
+    
+    player.ammo--;
+    document.getElementById('ammo').innerText = player.ammo;
+});
+
+// Проверка коллизий со стенами
+function checkWallCollision(x, y, radius) {
+    const cellsToCheck = [
+        {r: Math.floor((y - radius) / CELL_SIZE), c: Math.floor((x - radius) / CELL_SIZE)},
+        {r: Math.floor((y - radius) / CELL_SIZE), c: Math.floor((x + radius) / CELL_SIZE)},
+        {r: Math.floor((y + radius) / CELL_SIZE), c: Math.floor((x - radius) / CELL_SIZE)},
+        {r: Math.floor((y + radius) / CELL_SIZE), c: Math.floor((x + radius) / CELL_SIZE)}
+    ];
+    for (let cell of cellsToCheck) {
+        if (cell.r < 0 || cell.r >= GRID_SIZE || cell.c < 0 || cell.c >= GRID_SIZE) return true;
+        if (maze[cell.r][cell.c] === 1) return true;
+    }
+    return false;
+}
+
+// Обновление состояния игры
+function update() {
+    let dx = 0;
+    let dy = 0;
+    if (keys['w'] || keys['arrowup']) dy = -player.speed;
+    if (keys['s'] || keys['arrowdown']) dy = player.speed;
+    if (keys['a'] || keys['arrowleft']) dx = -player.speed;
+    if (keys['d'] || keys['arrowright']) dx = player.speed;
+
+    // Движение по осям с проверкой коллизий
+    if (dx !== 0) {
+        player.x += dx;
+        if (checkWallCollision(player.x, player.y, player.radius)) player.x -= dx;
+    }
+    if (dy !== 0) {
+        player.y += dy;
+        if (checkWallCollision(player.x, player.y, player.radius)) player.y -= dy;
+    }
+
+    // Проверка сбора патронов
+    ammoClips.forEach(clip => {
+        if (!clip.collected) {
+            const dist = Math.hypot(player.x - clip.x, player.y - clip.y);
+            if (dist < player.radius + 10) {
+                clip.collected = true;
+                player.ammo += 10;
+                document.getElementById('ammo').innerText = player.ammo;
+            }
+        }
+    });
+
+    // Движение и логика врагов
+    enemies.forEach(enemy => {
+        if (!enemy.alive) return;
+        const distToPlayer = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+        
+        // Враг агрится, если игрок близко (даже в тумане)
+        if (distToPlayer < player.lightRadius * 1.2) {
+            const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+            const nextX = enemy.x + Math.cos(angle) * enemy.speed;
+            const nextY = enemy.y + Math.sin(angle) * enemy.speed;
+            
+            if (!checkWallCollision(nextX, enemy.y, player.radius)) enemy.x = nextX;
+            if (!checkWallCollision(enemy.x, nextY, player.radius)) enemy.y = nextY;
+        }
+
+        // Столкновение врага с игроком
+        if (distToPlayer < player.radius + 10) {
+            document.getElementById('status').innerText = "ВЫ ПОГИБЛИ!";
+            resetGame();
+        }
+    });
+
+    // Полет пуль
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx;
+        b.y += b.vy;
+
+        // Попадание в стену
+        if (checkWallCollision(b.x, b.y, 2)) {
+            bullets.splice(i, 1);
+            continue;
+        }
+
+        // Попадание во врага
+        for (let enemy of enemies) {
+            if (enemy.alive && Math.hypot(b.x - enemy.x, b.y - enemy.y) < 15) {
+                enemy.alive = false;
+                bullets.splice(i, 1);
+                document.getElementById('enemies').innerText = enemies.filter(e => e.alive).length;
+                break;
+            }
+        }
+    }
+
+    // Проверка победы (достижение выхода)
+    const exitX = (GRID_SIZE - 1.5) * CELL_SIZE;
+    const exitY = (GRID_SIZE - 1.5) * CELL_SIZE;
+    if (Math.hypot(player.x - exitX, player.y - exitY) < player.radius + 10) {
+        alert("Победа! Вы выбрались из лабиринта!");
+        resetGame();
+    }
+}
+
+function resetGame() {
+    player.x = 1.5 * CELL_SIZE;
+    player.y = 1.5 * CELL_SIZE;
+    player.ammo = 10;
+    document.getElementById('ammo').innerText = player.ammo;
+    document.getElementById('status').innerText = "";
+    
+    // Перегенерация
+    maze = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(1));
+    generateMaze(1, 1);
+    maze[GRID_SIZE-2][GRID_SIZE-2] = 0;
+
+    // Сброс ресурсов и врагов
+    ammoClips.forEach(clip => {
+        const cell = getRandomEmptyCell();
+        clip.x = (cell.c + 0.5) * CELL_SIZE;
+        clip.y = (cell.r + 0.5) * CELL_SIZE;
+        clip.collected = false;
+    });
+
+    enemies.forEach(enemy => {
+        const cell = getRandomEmptyCell();
+        enemy.x = (cell.c + 0.5) * CELL_SIZE;
+        enemy.y = (cell.r + 0.5) * CELL_SIZE;
+        enemy.alive = true;
+    });
+    document.getElementById('enemies').innerText = 5;
+}
+
+// Отрисовка
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Временный холст для Тумана Войны
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+
+    // Рисуем лабиринт и объекты на основном холсте
+    for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+            if (maze[r][c] === 1) {
+                ctx.fillStyle = '#2c3e50';
+                ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
+        }
+    }
+
+    // Выход (зеленый квадрат)
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillRect((GRID_SIZE - 2) * CELL_SIZE + 5, (GRID_SIZE - 2) * CELL_SIZE + 5, CELL_SIZE - 10, CELL_SIZE - 10);
+
+    // Рисуем обоймы
+    ammoClips.forEach(clip => {
+        if (!clip.collected) {
+            ctx.fillStyle = '#f1c40f';
+            ctx.fillRect(clip.x - 6, clip.y - 6, 12, 12);
+        }
+    });
+
+    // Рисуем врагов
+    enemies.forEach(enemy => {
+        if (enemy.alive) {
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(enemy.x, enemy.y, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    });
+
+    // Рисуем пули
+    bullets.forEach(b => {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // Рисуем игрока
+    ctx.fillStyle = '#3498db';
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // НАКЛАДЫВАЕМ ТУМАН ВОЙНЫ
+    tempCtx.fillStyle = 'rgba(0, 0, 0, 0.96)'; // Густота тумана
+    tempCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // "Вырезаем" круг света вокруг игрока
+    tempCtx.globalCompositeOperation = 'destination-out';
+    const grad = tempCtx.createRadialGradient(player.x, player.y, player.lightRadius * 0.2, player.x, player.y, player.lightRadius);
+    grad.addColorStop(0, 'rgba(0,0,0,1)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    tempCtx.fillStyle = grad;
+    tempCtx.beginPath();
+    tempCtx.arc(player.x, player.y, player.lightRadius, 0, Math.PI * 2);
+    tempCtx.fill();
+
+    // Рисуем туман поверх сцены
+    ctx.drawImage(tempCanvas, 0, 0);
+}
+
+// Игровой цикл
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
