@@ -15,9 +15,6 @@
         .epic-controls { display: flex; justify-content: center; gap: 15px; padding: 10px; background: #1a1a1a; border-bottom: 2px solid #444; }
         .epic-controls button { padding: 8px 15px; font-weight: bold; cursor: pointer; border: none; border-radius: 4px; color: white; }
         .epic-controls button:disabled { background: #333 !important; color: #777 !important; cursor: not-allowed; }
-        #heli-btn { background: #28a745; }
-        #spec-ops-btn { background: #dc3545; }
-        #upg-citadel-btn { background: #6c757d; }
 
         #game-container { position: relative; width: 800px; margin: 20px auto; }
         canvas { background: #343434; display: block; border: 4px solid #555; cursor: crosshair; }
@@ -46,7 +43,7 @@
             <span>Монеты: <b id="gold" style="color:#ffd700;">0</b></span>
             <span>Слизь: <b id="slime" style="color:#32cd32;">0</b></span>
             <span>Кости: <b id="bones" style="color:#e0eeee;">0</b></span>
-            <span>Стена: <b id="wall-hp">1000/1000</b></span>
+            <span>Стена: <b id="wall-hp">1000/1000</b> <span id="shield-ui" style="color:cyan; display:none;">(+<b id="shield-hp">1000</b>)</span></span>
         </div>
         <div class="controls">
             <span style="margin-right: 15px; border-right: 2px solid #555; padding-right: 15px;">
@@ -55,6 +52,7 @@
                 <button onclick="setSpeed(5)" id="btn-s5" class="speed-btn">x5</button>
                 <button onclick="setSpeed(10)" id="btn-s10" class="speed-btn">x10</button>
             </span>
+            <button id="do-autoloot-btn" onclick="doAutoLoot()" style="display:none; background:#ff9800; color:#fff; font-weight:bold;">🧲 Собрать весь лут</button>
             <button onclick="repairWall()" id="repair-btn" title="1 кость = 100 HP">Чинить стену (1 кость = 100 HP)</button>
             <button onclick="togglePause()" id="pause-btn">Пауза</button>
             <button onclick="saveGame()">Сохранить</button>
@@ -63,9 +61,14 @@
     </div>
 
     <div class="epic-controls">
-        <button id="heli-btn" onclick="buyHeli()">🚁 Ждем 3-ю волну...</button>
-        <button id="spec-ops-btn" onclick="useSpecOps()" disabled>🔫 Вызвать Спецназ (0)</button>
-        <button id="upg-citadel-btn" onclick="upgradeCitadel()">Укрепить Цитадель: 2000 ХП (1000 костей)</button>
+        <button id="heli-status-btn" disabled style="background:#555;">🚁 Ждем 3-ю волну...</button>
+        
+        <button id="heli-specops-btn" onclick="buySpecOps()" style="display:none; background:#28a745;">🚁 Рация Спецназа (100 Слизи)</button>
+        <button id="heli-autoloot-btn" onclick="buyAutoLoot()" style="display:none; background:#ff9800;">🚁 Автосбор (500 Слизи)</button>
+        <button id="heli-shield-btn" onclick="buyShield()" style="display:none; background:#00bcd4;">🚁 Броня +1000 (1000 Слизи)</button>
+
+        <button id="spec-ops-btn" onclick="useSpecOps()" disabled style="background:#dc3545;">🔫 Вызвать Спецназ (0)</button>
+        <button id="upg-citadel-btn" onclick="upgradeCitadel()" style="background:#6c757d;">Укрепить Цитадель: 2000 ХП (1000 костей)</button>
     </div>
 
     <div id="game-container">
@@ -91,7 +94,7 @@ let isPaused = false;
 let lastTime = performance.now();
 let frameCount = 0;
 let gameState = "WAITING"; 
-let gameSpeed = 1; // Множитель скорости игры
+let gameSpeed = 1; 
 
 let waveNumber = 1;
 let baseZombies = 20;
@@ -105,8 +108,11 @@ let resources = { gold: 0, slime: 0, bones: 0 };
 let citadelUpgradeLevel = 0;
 const upgradeCosts = [1000, 5000, 10000];
 const upgradeMaxHPs = [2000, 10000, 50000];
+
 let specialOpsCharges = 0;
 let specialOpsActiveTimer = 0; 
+let hasAutoLoot = false;
+let citadelShield = 0;
 
 const citadel = {
     x: canvas.width / 2, y: canvas.height / 2,
@@ -131,12 +137,10 @@ let bullets = [];
 let loots = [];
 let selectedTurret = null;
 
-// Функция точной проверки присутствия вертолета на базе
 function isHeliAvailable() {
     return (waveNumber % 3 === 0 && gameState === "WAVE") || (gameState === "WAITING" && (waveNumber - 1) % 3 === 0 && waveNumber > 1);
 }
 
-// Управление скоростью
 function setSpeed(speed) {
     gameSpeed = speed;
     document.getElementById("btn-s1").style.background = speed === 1 ? "#28a745" : "#444";
@@ -148,7 +152,8 @@ function setSpeed(speed) {
 function saveGame() {
     const data = { 
         waveNumber, zombiesToSpawn, resources, hp: citadel.hp, maxHp: citadel.maxHp,
-        turrets, gameState, timers, citadelUpgradeLevel, specialOpsCharges 
+        turrets, gameState, timers, citadelUpgradeLevel, specialOpsCharges,
+        hasAutoLoot, citadelShield
     };
     localStorage.setItem("citadelSave", JSON.stringify(data));
     alert("Игра сохранена!");
@@ -168,21 +173,54 @@ function loadGame() {
         timers = data.timers;
         citadelUpgradeLevel = data.citadelUpgradeLevel || 0;
         specialOpsCharges = data.specialOpsCharges || 0;
+        hasAutoLoot = data.hasAutoLoot || false;
+        citadelShield = data.citadelShield || 0;
         
         zombies = []; bullets = []; loots = [];
         survivor.x = citadel.x; survivor.y = citadel.y;
+        
+        // Прячем экран окончания игры, если он был
+        document.getElementById("game-over").style.display = "none";
+        
         updateUI();
     } else {
         alert("Нет сохранений!");
     }
 }
 
-function buyHeli() {
+// Покупки у Яйцеголовых
+function buySpecOps() {
     if (isHeliAvailable() && resources.slime >= 100) {
         resources.slime -= 100;
         specialOpsCharges++;
         updateUI();
     }
+}
+
+function buyAutoLoot() {
+    if (isHeliAvailable() && resources.slime >= 500 && !hasAutoLoot) {
+        resources.slime -= 500;
+        hasAutoLoot = true;
+        updateUI();
+    }
+}
+
+function buyShield() {
+    if (isHeliAvailable() && resources.slime >= 1000 && citadelShield <= 0) {
+        resources.slime -= 1000;
+        citadelShield = 1000;
+        updateUI();
+    }
+}
+
+function doAutoLoot() {
+    if (!hasAutoLoot || loots.length === 0) return;
+    
+    loots.forEach(item => {
+        resources[item.type]++;
+    });
+    loots = [];
+    updateUI();
 }
 
 function useSpecOps() {
@@ -286,7 +324,7 @@ function spawnZombie() {
 
     let zHp = Math.round(50 * Math.pow(1.01, waveNumber - 1));
     let baseSpeed = 7.5 + Math.random() * 5;
-    let zSpeed = baseSpeed * Math.pow(1.06, waveNumber - 1);
+    let zSpeed = baseSpeed * Math.pow(1.02, waveNumber - 1); // Вернул 1.02, чтобы совпадало с эталоном
 
     zombies.push({
         x: x, y: y, hp: zHp, maxHp: zHp, 
@@ -308,19 +346,51 @@ function updateUI() {
     else if (gameState === "WAVE") statusEl.innerText = `Врагов: ${zombies.length + zombiesToSpawn}`;
     else if (gameState === "LOOTING") statusEl.innerText = `Сбор лута...`;
 
-    let heliBtn = document.getElementById("heli-btn");
-    if (isHeliAvailable()) {
-        heliBtn.innerText = `🚁 Купить рацию Спецназа (100 Слизи)`;
-        heliBtn.disabled = resources.slime < 100;
-        heliBtn.style.background = resources.slime >= 100 ? "#28a745" : "#555";
+    // UI Автосбора и Щита
+    document.getElementById("do-autoloot-btn").style.display = hasAutoLoot ? "inline-block" : "none";
+    if (citadelShield > 0) {
+        document.getElementById("shield-ui").style.display = "inline";
+        document.getElementById("shield-hp").innerText = citadelShield;
     } else {
+        document.getElementById("shield-ui").style.display = "none";
+    }
+
+    // Меню Вертолета
+    let btnStatus = document.getElementById("heli-status-btn");
+    let btnSpec = document.getElementById("heli-specops-btn");
+    let btnLoot = document.getElementById("heli-autoloot-btn");
+    let btnShield = document.getElementById("heli-shield-btn");
+
+    if (isHeliAvailable()) {
+        btnStatus.style.display = "none";
+        
+        btnSpec.style.display = "inline-block";
+        btnSpec.disabled = resources.slime < 100;
+
+        if (waveNumber >= 30 && !hasAutoLoot) {
+            btnLoot.style.display = "inline-block";
+            btnLoot.disabled = resources.slime < 500;
+        } else {
+            btnLoot.style.display = "none";
+        }
+
+        if (waveNumber >= 40 && citadelShield <= 0) {
+            btnShield.style.display = "inline-block";
+            btnShield.disabled = resources.slime < 1000;
+        } else {
+            btnShield.style.display = "none";
+        }
+    } else {
+        btnStatus.style.display = "inline-block";
+        btnSpec.style.display = "none";
+        btnLoot.style.display = "none";
+        btnShield.style.display = "none";
+
         let nextWave = waveNumber;
         while (nextWave % 3 !== 0 || (nextWave === waveNumber && gameState === "WAITING" && waveNumber > 1)) {
             nextWave++;
         }
-        heliBtn.innerText = `🚁 Вертолет прилетит на ${nextWave} волне`;
-        heliBtn.disabled = true;
-        heliBtn.style.background = "#555";
+        btnStatus.innerText = `🚁 Вертолет прилетит на ${nextWave} волне`;
     }
 
     let specOpsBtn = document.getElementById("spec-ops-btn");
@@ -369,13 +439,7 @@ function updateGame(dt) {
         if (timers.waveWait <= 0) {
             gameState = "WAVE";
             zombiesToSpawn = Math.floor(baseZombies * Math.pow(1.1, waveNumber - 1));
-            
-            // ДИНАМИЧЕСКАЯ ЗАДЕРЖКА СПАВНА
-            // Максимальное время на спавн всех зомби - 3 минуты (180 000 мс)
-            // Задержка будет 2 секунды, пока волна не станет такой большой, что превысит 3 минуты. 
-            // Тогда спавн автоматически ускорится.
             spawnDelay = Math.min(2000, 180000 / zombiesToSpawn);
-            
             timers.spawn = 0;
             updateUI(); 
         }
@@ -412,7 +476,12 @@ function updateGame(dt) {
         } else {
             z.attackTimer += dt;
             if (z.attackTimer >= 1000) { 
-                citadel.hp -= 1; 
+                // Логика урона по Щиту
+                if (citadelShield > 0) {
+                    citadelShield -= 1;
+                } else {
+                    citadel.hp -= 1; 
+                }
                 z.attackTimer = 0;
             }
         }
@@ -550,9 +619,17 @@ function drawGame() {
     ctx.lineWidth = citadel.wallThickness + (citadelUpgradeLevel * 2); 
     ctx.strokeRect(citadel.x - citadel.size/2, citadel.y - citadel.size/2, citadel.size, citadel.size);
 
+    // Отрисовка Энергощита (если куплен)
+    if (citadelShield > 0) {
+        ctx.strokeStyle = "rgba(0, 255, 255, 0.6)";
+        ctx.lineWidth = 4;
+        let offset = citadel.wallThickness + (citadelUpgradeLevel * 2) + 4;
+        ctx.strokeRect(citadel.x - citadel.size/2 - offset/2, citadel.y - citadel.size/2 - offset/2, citadel.size + offset, citadel.size + offset);
+    }
+
     if (isHeliAvailable()) {
         ctx.save();
-        ctx.translate(citadel.x, citadel.y - citadel.size / 2 - 35);
+        ctx.translate(citadel.x, citadel.y - citadel.size / 2 - 45); // Чуть отодвинул вверх из-за щита
         
         ctx.strokeStyle = "#777";
         ctx.lineWidth = 3;
@@ -571,7 +648,6 @@ function drawGame() {
         
         ctx.strokeStyle = "#bbb";
         ctx.lineWidth = 2;
-        // Вращение винта не зависит от gameSpeed, чтобы анимация была плавной
         let bladeAngle = (performance.now() / 40) % (Math.PI * 2);
         ctx.beginPath();
         ctx.moveTo(-Math.cos(bladeAngle) * 28, -14);
@@ -669,11 +745,9 @@ function gameLoop(timestamp) {
     let dt = timestamp - lastTime;
     lastTime = timestamp;
 
-    // Защита от огромных скачков dt, если игрок свернул вкладку браузера
     if (dt > 100) dt = 16; 
 
     if (!isPaused) {
-        // Выполняем игровую логику несколько раз за кадр в зависимости от gameSpeed
         for (let i = 0; i < gameSpeed; i++) {
             updateGame(dt);
         }
