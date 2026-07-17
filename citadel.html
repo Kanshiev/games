@@ -39,10 +39,10 @@
             <span>Монеты: <b id="gold" style="color:#ffd700;">0</b></span>
             <span>Слизь: <b id="slime" style="color:#32cd32;">0</b></span>
             <span>Кости: <b id="bones" style="color:#e0eeee;">0</b></span>
-            <span>Стена: <b id="wall-hp">200/200</b></span>
+            <span>Стена: <b id="wall-hp">1000/1000</b></span>
         </div>
         <div class="controls">
-            <button onclick="repairWall()" id="repair-btn" title="1 кость = 10 HP">Починить стену (1 кость = 10 HP)</button>
+            <button onclick="repairWall()" id="repair-btn" title="1 кость = 100 HP">Починить стену (1 кость = 100 HP)</button>
             <button onclick="togglePause()" id="pause-btn">Пауза</button>
             <button onclick="saveGame()">Сохранить</button>
             <button onclick="loadGame()">Загрузить</button>
@@ -76,7 +76,7 @@ let waveNumber = 1;
 let baseZombies = 20;
 let zombiesToSpawn = baseZombies;
 let timeBetweenWaves = 10000; 
-let spawnDelay = 1000; 
+let spawnDelay = 2500; 
 
 let timers = {
     waveWait: 3000, 
@@ -89,8 +89,8 @@ const citadel = {
     x: canvas.width / 2,
     y: canvas.height / 2,
     size: 140, 
-    maxHp: 200,
-    hp: 200,
+    maxHp: 1000,
+    hp: 1000,
     wallThickness: 15
 };
 
@@ -153,7 +153,7 @@ function togglePause() {
 function repairWall() {
     if (resources.bones >= 1 && citadel.hp < citadel.maxHp && gameState !== "GAME_OVER") {
         resources.bones--;
-        citadel.hp = Math.min(citadel.maxHp, citadel.hp + 10); // Исправлено на 10 HP
+        citadel.hp = Math.min(citadel.maxHp, citadel.hp + 100); // Исправлено на 10 HP
         updateUI();
     }
 }
@@ -292,8 +292,8 @@ function updateGame(dt) {
             z.y += (dy / dist) * z.speed * (dt / 1000); // ИСПРАВЛЕНО: добавил движение по оси Y
         } else {
             z.attackTimer += dt;
-            if (z.attackTimer >= 1000) { 
-                citadel.hp -= 2; 
+            if (z.attackTimer >= 2000) { 
+                citadel.hp -= 1; 
                 z.attackTimer = 0;
             }
         }
