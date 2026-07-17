@@ -342,7 +342,7 @@ function spawnZombie() {
 
     let zHp = Math.round(50 * Math.pow(1.01, waveNumber - 1));
     let baseSpeed = 7.5 + Math.random() * 5;
-    let zSpeed = baseSpeed * Math.pow(1.02, waveNumber - 1); 
+    let zSpeed = baseSpeed * Math.pow(1.06, waveNumber - 1); 
 
     zombies.push({
         x: x, y: y, hp: zHp, maxHp: zHp, 
