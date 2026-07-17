@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Wasteland Citadel Defense</title>
+    <style>
+        body { margin: 0; background: #222; color: #fff; font-family: sans-serif; text-align: center; overflow: hidden; }
+        canvas { background: #343434; display: block; margin: 20px auto; border: 4px solid #555; }
+        #ui { font-size: 18px; margin-bottom: 10px; }
+        .stat { margin: 0 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>Укрепление Выживших: Первая Проверка</h2>
+    <div id="ui">
+        <span class="stat">Волна: <span id="wave-num">1</span></span>
+        <span class="stat">Статус: <span id="status">Ожидание волны</span></span>
+        <span class="stat">Монеты: <span id="gold">0</span></span>
+        <span class="stat">Биомасса: <span id="slime">0</span></span>
+        <span class="stat">Кости: <span id="bones">0</span></span>
+    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+// Игровые настройки и баланс
+const TIME_BETWEEN_WAVES = 20000; // Для теста: 20 секунд вместо 3 минут (180000)
+const TOTAL_ZOMBIES_PER_WAVE = 20;
+const SPAWN_DELAY = 800; // задержка спавна зомби в мс
+
+// Состояния игры: "WAITING", "WAVE", "LOOTING"
+let gameState = "WAITING"; 
+let waveNumber = 1;
+let nextWaveTime = Date.now() + 3000; // первая волна через 3 секунды после старта
+
+// Ресурсы
+let resources = { gold: 0, slime: 0, bones: 0 };
+
+// Цитадель (Центр)
+const citadel = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    size: 80
+};
+
+// Выживший
+const survivor = {
+    x: citadel.x,
+    y: citadel.y,
+    speed: 4,
+    size: 8,
+    targetLoot: null
+};
+
+// Пушки по углам цитадели
+const guns = [
+    { x: citadel.x - citadel.size/2, y: citadel.y - citadel.size/2, lastShot: 0, cooldown: 400 },
+    { x: citadel.x + citadel.size/2, y: citadel.y - citadel.size/2, lastShot: 0, cooldown: 400 },
+    { x: citadel.x - citadel.size/2, y: citadel.y + citadel.size/2, lastShot: 0, cooldown: 400 },
+    { x: citadel.x + citadel.size/2, y: citadel.y + citadel.size/2, lastShot: 0, cooldown: 400 }
+];
+
+// Массивы объектов
+let zombies = [];
+let bullets = [];
+let loots = [];
+
+// Контроль спавна волны
+let zombiesSpawnedThisWave = 0;
+let lastZombieSpawnTime = 0;
+
+function updateUI() {
+    document.getElementById("wave-num").innerText = waveNumber;
+    document.getElementById("gold").innerText = resources.gold;
+    document.getElementById("slime").innerText = resources.slime;
+    document.getElementById("bones").innerText = resources.bones;
+    
+    if (gameState === "WAITING") {
+        let timeLeft = Math.max(0, Math.round((nextWaveTime - Date.now()) / 1000));
+        document.getElementById("status").innerText = `До волны: ${timeLeft} сек`;
+    } else if (gameState === "WAVE") {
+        document.getElementById("status").innerText = `Оборона! (Осталось: ${zombies.length + (TOTAL_ZOMBIES_PER_WAVE - zombiesSpawnedThisWave)})`;
+    } else if (gameState === "LOOTING") {
+        document.getElementById("status").innerText = `Сбор лута...`;
+    }
+}
+
+function spawnZombie() {
+    // Спавн за пределами экрана по случайной стороне
+    let x, y;
+    const edge = Math.floor(Math.random() * 4);
+    if (edge === 0) { x = Math.random() * canvas.width; y = -20; }       // верх
+    else if (edge === 1) { x = canvas.width + 20; y = Math.random() * canvas.height; } // право
+    else if (edge === 2) { x = Math.random() * canvas.width; y = canvas.height + 20; } // низ
+    else { x = -20; y = Math.random() * canvas.height; }                // лево
+
+    zombies.push({
+        x: x,
+        y: y,
+        speed: 0.8 + Math.random() * 0.5,
+        hp: 20,
+        size: 10
+    });
+    zombiesSpawnedThisWave++;
+}
+
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let now = Date.now();
+
+    // --- Логика состояний ---
+    if (gameState === "WAITING" && now >= nextWaveTime) {
+        gameState = "WAVE";
+        zombiesSpawnedThisWave = 0;
+    }
+
+    if (gameState === "WAVE") {
+        if (zombiesSpawnedThisWave < TOTAL_ZOMBIES_PER_WAVE && now - lastZombieSpawnTime > SPAWN_DELAY) {
+            spawnZombie();
+            lastZombieSpawnTime = now;
+        }
+        // Если все зомби мертвы и волна отспавнилась
+        if (zombies.length === 0 && zombiesSpawnedThisWave === TOTAL_ZOMBIES_PER_WAVE) {
+            gameState = loots.length > 0 ? "LOOTING" : "WAITING";
+            if (gameState === "WAITING") nextWaveTime = now + TIME_BETWEEN_WAVES;
+        }
+    }
+
+    // --- Движение зомби и стрельба пушек ---
+    zombies.forEach((zombie, zIdx) => {
+        // Зомби идут к цитадели
+        let dx = citadel.x - zombie.x;
+        let dy = citadel.y - zombie.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        
+        if (dist > citadel.size / 2) {
+            zombie.x += (dx / dist) * zombie.speed;
+            zombie.y += (dy / dist) * zombie.speed;
+        }
+
+        // Отрисовка зомби
+        ctx.fillStyle = "#5d7a42";
+        ctx.beginPath();
+        ctx.arc(zombie.x, zombie.y, zombie.size, 0, Math.PI*2);
+        ctx.fill();
+    });
+
+    // Автоматическая стрельба пушек
+    if (gameState === "WAVE" && zombies.length > 0) {
+        guns.forEach(gun => {
+            if (now - gun.lastShot > gun.cooldown) {
+                // Находим ближайшего зомби к этой пушке
+                let target = null;
+                let minDist = Infinity;
+                zombies.forEach(zombie => {
+                    let dx = zombie.x - gun.x;
+                    let dy = zombie.y - gun.y;
+                    let d = Math.sqrt(dx*dx + dy*dy);
+                    if (d < minDist) { minDist = d; target = zombie; }
+                });
+
+                if (target) {
+                    let tx = target.x - gun.x;
+                    let ty = target.y - gun.y;
+                    let tDist = Math.sqrt(tx*tx + ty*ty);
+                    bullets.push({
+                        x: gun.x,
+                        y: gun.y,
+                        vx: (tx / tDist) * 6,
+                        vy: (ty / tDist) * 6,
+                        damage: 10
+                    });
+                    gun.lastShot = now;
+                }
+            }
+        });
+    }
+
+    // --- Движение пуль ---
+    bullets.forEach((b, bIdx) => {
+        b.x += b.vx;
+        b.y += b.vy;
+
+        // Рендер пули
+        ctx.fillStyle = "#ffdd44";
+        ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+
+        // Столкновение пули с зомби
+        zombies.forEach((zombie, zIdx) => {
+            let dx = b.x - zombie.x;
+            let dy = b.y - zombie.y;
+            if (Math.sqrt(dx*dx + dy*dy) < zombie.size) {
+                zombie.hp -= b.damage;
+                bullets.splice(bIdx, 1);
+
+                // Смерть зомби
+                if (zombie.hp <= 0) {
+                    // Выпадение лута
+                    let rand = Math.random();
+                    let type = "gold";
+                    if (rand > 0.4 && rand <= 0.8) type = "slime";
+                    else if (rand > 0.8) type = "bones";
+
+                    loots.push({ x: zombie.x, y: zombie.y, type: type });
+                    zombies.splice(zIdx, 1);
+                }
+            }
+        });
+
+        // Удаление пуль за экраном
+        if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+            bullets.splice(bIdx, 1);
+        }
+    });
+
+    // --- Авто-сбор лута выжившим ---
+    if (gameState === "LOOTING") {
+        if (loots.length === 0) {
+            // Весь лут собран, возвращаемся в цитадель
+            let dx = citadel.x - survivor.x;
+            let dy = citadel.y - survivor.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist > 2) {
+                survivor.x += (dx / dist) * survivor.speed;
+                survivor.y += (dy / dist) * survivor.speed;
+            } else {
+                gameState = "WAITING";
+                nextWaveTime = Date.now() + TIME_BETWEEN_WAVES;
+            }
+        } else {
+            // Ищем ближайший лут
+            if (!survivor.targetLoot || !loots.includes(survivor.targetLoot)) {
+                let minDist = Infinity;
+                loots.forEach(item => {
+                    let dx = item.x - survivor.x;
+                    let dy = item.y - survivor.y;
+                    let d = Math.sqrt(dx*dx + dy*dy);
+                    if (d < minDist) { minDist = d; survivor.targetLoot = item; }
+                });
+            }
+
+            // Бежим к луту
+            if (survivor.targetLoot) {
+                let dx = survivor.targetLoot.x - survivor.x;
+                let dy = survivor.targetLoot.y - survivor.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+
+                if (dist > survivor.speed) {
+                    survivor.x += (dx / dist) * survivor.speed;
+                    survivor.y += (dy / dist) * survivor.speed;
+                } else {
+                    // Подобрал лут
+                    resources[survivor.targetLoot.type]++;
+                    loots.splice(loots.indexOf(survivor.targetLoot), 1);
+                    survivor.targetLoot = null;
+                }
+            }
+        }
+    } else {
+        // Во время волны или ожидания выживший сидит в центре
+        let dx = citadel.x - survivor.x;
+        let dy = citadel.y - survivor.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 2) {
+            survivor.x += (dx / dist) * survivor.speed;
+            survivor.y += (dy / dist) * survivor.speed;
+        }
+    }
+
+    // --- Отрисовка Окружения ---
+    
+    // Цитадель
+    ctx.fillStyle = "#555";
+    ctx.fillRect(citadel.x - citadel.size/2, citadel.y - citadel.size/2, citadel.size, citadel.size);
+    ctx.strokeStyle = "#777";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(citadel.x - citadel.size/2, citadel.y - citadel.size/2, citadel.size, citadel.size);
+
+    // Пушки
+    guns.forEach(gun => {
+        ctx.fillStyle = "#999";
+        ctx.fillRect(gun.x - 6, gun.y - 6, 12, 12);
+        ctx.fillStyle = "#111";
+        ctx.fillRect(gun.x - 3, gun.y - 3, 6, 6);
+    });
+
+    // Лут на земле
+    loots.forEach(item => {
+        if (item.type === "gold") ctx.fillStyle = "#ffd700";
+        else if (item.type === "slime") ctx.fillStyle = "#32cd32";
+        else ctx.fillStyle = "#e0eeee";
+
+        ctx.beginPath();
+        ctx.arc(item.x, item.y, 5, 0, Math.PI*2);
+        ctx.fill();
+    });
+
+    // Выживший
+    ctx.fillStyle = "#00bcd4";
+    ctx.beginPath();
+    ctx.arc(survivor.x, survivor.y, survivor.size, 0, Math.PI*2);
+    ctx.fill();
+
+    updateUI();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
