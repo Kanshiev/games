@@ -11,7 +11,6 @@
         .controls button { padding: 8px 12px; margin-left: 5px; cursor: pointer; background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; }
         .controls button:hover { background: #555; }
         
-        /* Новая панель для слизи и костей */
         .epic-controls { display: flex; justify-content: center; gap: 15px; padding: 10px; background: #1a1a1a; border-bottom: 2px solid #444; }
         .epic-controls button { padding: 8px 15px; font-weight: bold; cursor: pointer; border: none; border-radius: 4px; color: white; }
         .epic-controls button:disabled { background: #333 !important; color: #777 !important; cursor: not-allowed; }
@@ -22,7 +21,6 @@
         #game-container { position: relative; width: 800px; margin: 20px auto; }
         canvas { background: #343434; display: block; border: 4px solid #555; cursor: crosshair; }
         
-        /* Меню апгрейдов */
         #upgrade-menu {
             display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: rgba(0, 0, 0, 0.9); border: 2px solid #777; padding: 20px; border-radius: 8px; text-align: center;
@@ -47,7 +45,7 @@
             <span>Монеты: <b id="gold" style="color:#ffd700;">0</b></span>
             <span>Слизь: <b id="slime" style="color:#32cd32;">0</b></span>
             <span>Кости: <b id="bones" style="color:#e0eeee;">0</b></span>
-            <span>Стена: <b id="wall-hp">500/500</b></span>
+            <span>Стена: <b id="wall-hp">1000/1000</b></span>
         </div>
         <div class="controls">
             <button onclick="repairWall()" id="repair-btn" title="1 кость = 10 HP">Чинить стену (1 кость = 10 HP)</button>
@@ -95,16 +93,15 @@ let spawnDelay = 1000;
 let timers = { waveWait: 3000, spawn: 0 };
 let resources = { gold: 0, slime: 0, bones: 0 };
 
-// Глобальные апгрейды
 let citadelUpgradeLevel = 0;
 const upgradeCosts = [1000, 5000, 10000];
 const upgradeMaxHPs = [2000, 10000, 50000];
 let specialOpsCharges = 0;
-let specialOpsActiveTimer = 0; // в миллисекундах
+let specialOpsActiveTimer = 0; 
 
 const citadel = {
     x: canvas.width / 2, y: canvas.height / 2,
-    size: 140, maxHp: 500, hp: 500, wallThickness: 15
+    size: 140, maxHp: 1000, hp: 1000, wallThickness: 15
 };
 
 const survivor = { x: citadel.x, y: citadel.y, speed: 120, size: 8, targetLoot: null };
@@ -125,7 +122,6 @@ let bullets = [];
 let loots = [];
 let selectedTurret = null;
 
-// --- СОХРАНЕНИЕ / ЗАГРУЗКА ---
 function saveGame() {
     const data = { 
         waveNumber, zombiesToSpawn, resources, hp: citadel.hp, maxHp: citadel.maxHp,
@@ -143,7 +139,7 @@ function loadGame() {
         zombiesToSpawn = data.zombiesToSpawn;
         resources = data.resources;
         citadel.hp = data.hp;
-        citadel.maxHp = data.maxHp || 500;
+        citadel.maxHp = data.maxHp || 1000;
         turrets = data.turrets;
         gameState = data.gameState === "GAME_OVER" ? "WAITING" : data.gameState; 
         timers = data.timers;
@@ -158,7 +154,6 @@ function loadGame() {
     }
 }
 
-// --- НОВЫЕ МЕХАНИКИ ---
 function buyHeli() {
     if (waveNumber % 3 === 0 && resources.slime >= 100) {
         resources.slime -= 100;
@@ -170,7 +165,7 @@ function buyHeli() {
 function useSpecOps() {
     if (specialOpsCharges > 0 && specialOpsActiveTimer <= 0) {
         specialOpsCharges--;
-        specialOpsActiveTimer = 5000; // 5 секунд зачистки
+        specialOpsActiveTimer = 5000; 
         updateUI();
     }
 }
@@ -181,13 +176,12 @@ function upgradeCitadel() {
     if (resources.bones >= cost) {
         resources.bones -= cost;
         citadel.maxHp = upgradeMaxHPs[citadelUpgradeLevel];
-        citadel.hp = citadel.maxHp; // Лечим полностью при улучшении
+        citadel.hp = citadel.maxHp; 
         citadelUpgradeLevel++;
         updateUI();
     }
 }
 
-// --- УПРАВЛЕНИЕ UI ---
 function togglePause() {
     if (gameState === "GAME_OVER") return;
     isPaused = !isPaused;
@@ -249,7 +243,6 @@ function buyUpgrade(type) {
     
     if (resources.gold >= cost) {
         resources.gold -= cost;
-        // Восстановлены твои условия апгрейдов в процентах
         if (type === 'range') selectedTurret.range *= 1.25;
         if (type === 'speed') selectedTurret.maxCooldown *= 0.75;
         if (type === 'damage') selectedTurret.damage *= 1.25;
@@ -268,10 +261,9 @@ function spawnZombie() {
     else if (edge === 2) { x = Math.random() * canvas.width; y = canvas.height + 20; }
     else { x = -20; y = Math.random() * canvas.height; }
 
-    // ХП: базовые 50 + рост
     let zHp = 50 + waveNumber * 5;
-    // Скорость: база (15-25) + 2% за каждую пройденную волну
-    let baseSpeed = 15 + Math.random() * 10;
+    // Снижена базовая скорость зомби в 2 раза
+    let baseSpeed = 7.5 + Math.random() * 5;
     let zSpeed = baseSpeed * Math.pow(1.02, waveNumber - 1);
 
     zombies.push({
@@ -294,7 +286,6 @@ function updateUI() {
     else if (gameState === "WAVE") statusEl.innerText = `Врагов: ${zombies.length + zombiesToSpawn}`;
     else if (gameState === "LOOTING") statusEl.innerText = `Сбор лута...`;
 
-    // Апдейт новых кнопок
     let heliBtn = document.getElementById("heli-btn");
     if (waveNumber % 3 === 0) {
         heliBtn.innerText = `🚁 Купить рацию Спецназа (100 Слизи)`;
@@ -334,11 +325,8 @@ function updateGame(dt) {
         return;
     }
 
-    // ЛОГИКА СПЕЦНАЗА
     if (specialOpsActiveTimer > 0) {
         specialOpsActiveTimer -= dt;
-        
-        // Мгновенное убийство всех на экране
         if (zombies.length > 0) {
             zombies.forEach(z => {
                 let rand = Math.random();
@@ -357,7 +345,7 @@ function updateGame(dt) {
             gameState = "WAVE";
             zombiesToSpawn = Math.floor(baseZombies * Math.pow(1.1, waveNumber - 1));
             timers.spawn = 0;
-            updateUI(); // Обновляем UI, чтобы кнопка вертолета появилась/исчезла
+            updateUI(); 
         }
     }
 
@@ -392,7 +380,7 @@ function updateGame(dt) {
         } else {
             z.attackTimer += dt;
             if (z.attackTimer >= 1000) { 
-                citadel.hp -= 2; 
+                citadel.hp -= 1; // Урон снижен с 2 до 1
                 z.attackTimer = 0;
             }
         }
@@ -522,13 +510,12 @@ function drawGame() {
     ctx.fillStyle = "#333";
     ctx.fillRect(citadel.x - citadel.size/2, citadel.y - citadel.size/2, citadel.size, citadel.size);
     
-    // В зависимости от уровня стены меняем ее визуальный цвет
     if (citadelUpgradeLevel === 0) ctx.strokeStyle = `rgb(${255 - wallHealthRatio * 150}, ${wallHealthRatio * 150}, 50)`;
-    else if (citadelUpgradeLevel === 1) ctx.strokeStyle = `#888`; // Бетон
-    else if (citadelUpgradeLevel === 2) ctx.strokeStyle = `#556`; // Усиленный бетон
-    else ctx.strokeStyle = `#345`; // Железобетон
+    else if (citadelUpgradeLevel === 1) ctx.strokeStyle = `#888`; 
+    else if (citadelUpgradeLevel === 2) ctx.strokeStyle = `#556`; 
+    else ctx.strokeStyle = `#345`; 
     
-    ctx.lineWidth = citadel.wallThickness + (citadelUpgradeLevel * 2); // С каждым апгрейдом стена толще!
+    ctx.lineWidth = citadel.wallThickness + (citadelUpgradeLevel * 2); 
     ctx.strokeRect(citadel.x - citadel.size/2, citadel.y - citadel.size/2, citadel.size, citadel.size);
 
     turrets.forEach(t => {
@@ -586,7 +573,6 @@ function drawGame() {
         ctx.fillRect(b.x - 3, b.y - 3, 6, 6); 
     });
 
-    // Визуализация работы спецназа (лазеры на весь экран)
     if (specialOpsActiveTimer > 0) {
         ctx.fillStyle = "rgba(255, 0, 0, 0.1)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -622,7 +608,6 @@ function gameLoop(timestamp) {
         updateGame(dt);
     }
     
-    // Обновляем UI каждый кадр для таймеров (только если нужно)
     if (Math.floor(timestamp) % 10 === 0) updateUI();
     
     drawGame();
