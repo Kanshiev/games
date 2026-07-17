@@ -48,7 +48,7 @@
             <span>Стена: <b id="wall-hp">1000/1000</b></span>
         </div>
         <div class="controls">
-            <button onclick="repairWall()" id="repair-btn" title="1 кость = 10 HP">Чинить стену (1 кость = 10 HP)</button>
+            <button onclick="repairWall()" id="repair-btn" title="1 кость = 100 HP">Чинить стену (1 кость = 100 HP)</button>
             <button onclick="togglePause()" id="pause-btn">Пауза</button>
             <button onclick="saveGame()">Сохранить</button>
             <button onclick="loadGame()">Загрузить</button>
@@ -88,7 +88,7 @@ let waveNumber = 1;
 let baseZombies = 20;
 let zombiesToSpawn = baseZombies;
 let timeBetweenWaves = 10000; 
-let spawnDelay = 1000; 
+let spawnDelay = 2000; 
 
 let timers = { waveWait: 3000, spawn: 0 };
 let resources = { gold: 0, slime: 0, bones: 0 };
@@ -192,7 +192,7 @@ function togglePause() {
 function repairWall() {
     if (resources.bones >= 1 && citadel.hp < citadel.maxHp && gameState !== "GAME_OVER") {
         resources.bones--;
-        citadel.hp = Math.min(citadel.maxHp, citadel.hp + 10); 
+        citadel.hp = Math.min(citadel.maxHp, citadel.hp + 100); 
         updateUI();
     }
 }
