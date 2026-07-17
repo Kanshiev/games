@@ -10,6 +10,7 @@
         .stats span b { color: #fff; }
         .controls button { padding: 8px 12px; margin-left: 5px; cursor: pointer; background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; }
         .controls button:hover { background: #555; }
+        .speed-btn { font-weight: bold; }
         
         .epic-controls { display: flex; justify-content: center; gap: 15px; padding: 10px; background: #1a1a1a; border-bottom: 2px solid #444; }
         .epic-controls button { padding: 8px 15px; font-weight: bold; cursor: pointer; border: none; border-radius: 4px; color: white; }
@@ -48,6 +49,12 @@
             <span>Стена: <b id="wall-hp">1000/1000</b></span>
         </div>
         <div class="controls">
+            <span style="margin-right: 15px; border-right: 2px solid #555; padding-right: 15px;">
+                <button onclick="setSpeed(1)" id="btn-s1" class="speed-btn" style="background: #28a745;">x1</button>
+                <button onclick="setSpeed(2)" id="btn-s2" class="speed-btn">x2</button>
+                <button onclick="setSpeed(5)" id="btn-s5" class="speed-btn">x5</button>
+                <button onclick="setSpeed(10)" id="btn-s10" class="speed-btn">x10</button>
+            </span>
             <button onclick="repairWall()" id="repair-btn" title="1 кость = 100 HP">Чинить стену (1 кость = 100 HP)</button>
             <button onclick="togglePause()" id="pause-btn">Пауза</button>
             <button onclick="saveGame()">Сохранить</button>
@@ -84,6 +91,7 @@ let isPaused = false;
 let lastTime = performance.now();
 let frameCount = 0;
 let gameState = "WAITING"; 
+let gameSpeed = 1; // Множитель скорости игры
 
 let waveNumber = 1;
 let baseZombies = 20;
@@ -123,9 +131,18 @@ let bullets = [];
 let loots = [];
 let selectedTurret = null;
 
-// Функция точной проверки присутствия вертолета на базе (во время 3 волны ИЛИ в перерыве перед 4 волной)
+// Функция точной проверки присутствия вертолета на базе
 function isHeliAvailable() {
     return (waveNumber % 3 === 0 && gameState === "WAVE") || (gameState === "WAITING" && (waveNumber - 1) % 3 === 0 && waveNumber > 1);
+}
+
+// Управление скоростью
+function setSpeed(speed) {
+    gameSpeed = speed;
+    document.getElementById("btn-s1").style.background = speed === 1 ? "#28a745" : "#444";
+    document.getElementById("btn-s2").style.background = speed === 2 ? "#28a745" : "#444";
+    document.getElementById("btn-s5").style.background = speed === 5 ? "#28a745" : "#444";
+    document.getElementById("btn-s10").style.background = speed === 10 ? "#28a745" : "#444";
 }
 
 function saveGame() {
@@ -267,10 +284,7 @@ function spawnZombie() {
     else if (edge === 2) { x = Math.random() * canvas.width; y = canvas.height + 20; }
     else { x = -20; y = Math.random() * canvas.height; }
 
-    // ХП растет ровно на 1% за каждый следующий уровень (Сложный процент)
     let zHp = Math.round(50 * Math.pow(1.01, waveNumber - 1));
-    
-    // Скорость снижена в два раза и растет на 2% за уровень
     let baseSpeed = 7.5 + Math.random() * 5;
     let zSpeed = baseSpeed * Math.pow(1.02, waveNumber - 1);
 
@@ -355,6 +369,13 @@ function updateGame(dt) {
         if (timers.waveWait <= 0) {
             gameState = "WAVE";
             zombiesToSpawn = Math.floor(baseZombies * Math.pow(1.1, waveNumber - 1));
+            
+            // ДИНАМИЧЕСКАЯ ЗАДЕРЖКА СПАВНА
+            // Максимальное время на спавн всех зомби - 3 минуты (180 000 мс)
+            // Задержка будет 2 секунды, пока волна не станет такой большой, что превысит 3 минуты. 
+            // Тогда спавн автоматически ускорится.
+            spawnDelay = Math.min(2000, 180000 / zombiesToSpawn);
+            
             timers.spawn = 0;
             updateUI(); 
         }
@@ -529,39 +550,35 @@ function drawGame() {
     ctx.lineWidth = citadel.wallThickness + (citadelUpgradeLevel * 2); 
     ctx.strokeRect(citadel.x - citadel.size/2, citadel.y - citadel.size/2, citadel.size, citadel.size);
 
-    // ВЕРТОЛЕТ УЧЕНЫХ (Отрисовка на базе, когда он прилетел)
     if (isHeliAvailable()) {
         ctx.save();
         ctx.translate(citadel.x, citadel.y - citadel.size / 2 - 35);
         
-        // Шасси
         ctx.strokeStyle = "#777";
         ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(-15, 10); ctx.lineTo(15, 10); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(-10, 5); ctx.lineTo(-10, 10); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(10, 5); ctx.lineTo(10, 10); ctx.stroke();
         
-        // Корпус вертолета
         ctx.fillStyle = "#2e5c1e"; 
         ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
-        ctx.fillRect(0, -3, 25, 6); // Хвост
+        ctx.fillRect(0, -3, 25, 6); 
         ctx.fillStyle = "#111";
-        ctx.fillRect(23, -8, 2, 16); // Маленький хвостовой винт
+        ctx.fillRect(23, -8, 2, 16); 
         
-        // Кабина
         ctx.fillStyle = "#add8e6";
         ctx.beginPath(); ctx.arc(-6, -2, 5, 0, Math.PI * 2); ctx.fill();
         
-        // Главный винт (анимированное вращение)
         ctx.strokeStyle = "#bbb";
         ctx.lineWidth = 2;
+        // Вращение винта не зависит от gameSpeed, чтобы анимация была плавной
         let bladeAngle = (performance.now() / 40) % (Math.PI * 2);
         ctx.beginPath();
         ctx.moveTo(-Math.cos(bladeAngle) * 28, -14);
         ctx.lineTo(Math.cos(bladeAngle) * 28, -14);
         ctx.stroke();
         ctx.fillStyle = "#333";
-        ctx.fillRect(-2, -14, 4, 14); // Вал винта
+        ctx.fillRect(-2, -14, 4, 14); 
         
         ctx.restore();
     }
@@ -652,11 +669,16 @@ function gameLoop(timestamp) {
     let dt = timestamp - lastTime;
     lastTime = timestamp;
 
+    // Защита от огромных скачков dt, если игрок свернул вкладку браузера
+    if (dt > 100) dt = 16; 
+
     if (!isPaused) {
-        updateGame(dt);
+        // Выполняем игровую логику несколько раз за кадр в зависимости от gameSpeed
+        for (let i = 0; i < gameSpeed; i++) {
+            updateGame(dt);
+        }
     }
     
-    // Безупречное обновление UI по счетчику кадров
     frameCount++;
     if (frameCount % 10 === 0) updateUI();
     
