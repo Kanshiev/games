@@ -39,10 +39,10 @@
             <span>Монеты: <b id="gold" style="color:#ffd700;">0</b></span>
             <span>Слизь: <b id="slime" style="color:#32cd32;">0</b></span>
             <span>Кости: <b id="bones" style="color:#e0eeee;">0</b></span>
-            <span>Стена: <b id="wall-hp">100/100</b></span>
+            <span>Стена: <b id="wall-hp">200/200</b></span>
         </div>
         <div class="controls">
-            <button onclick="repairWall()" id="repair-btn" title="1 кость = 10 HP">Починить стену (1 кость)</button>
+            <button onclick="repairWall()" id="repair-btn" title="1 кость = 10 HP">Починить стену (1 кость = 10 HP)</button>
             <button onclick="togglePause()" id="pause-btn">Пауза</button>
             <button onclick="saveGame()">Сохранить</button>
             <button onclick="loadGame()">Загрузить</button>
@@ -70,16 +70,16 @@ const ctx = canvas.getContext("2d");
 // --- ИГРОВЫЕ ПЕРЕМЕННЫЕ ---
 let isPaused = false;
 let lastTime = performance.now();
-let gameState = "WAITING"; // WAITING, WAVE, LOOTING, GAME_OVER
+let gameState = "WAITING"; 
 
 let waveNumber = 1;
 let baseZombies = 20;
 let zombiesToSpawn = baseZombies;
-let timeBetweenWaves = 10000; // 10 сек между волнами
-let spawnDelay = 1000; // 1 зомби в секунду
+let timeBetweenWaves = 10000; 
+let spawnDelay = 1000; 
 
 let timers = {
-    waveWait: 3000, // старт через 3 сек
+    waveWait: 3000, 
     spawn: 0
 };
 
@@ -88,7 +88,7 @@ let resources = { gold: 0, slime: 0, bones: 0 };
 const citadel = {
     x: canvas.width / 2,
     y: canvas.height / 2,
-    size: 140, // Увеличили цитадель
+    size: 140, 
     maxHp: 200,
     hp: 200,
     wallThickness: 15
@@ -98,14 +98,14 @@ const survivor = {
     x: citadel.x, y: citadel.y, speed: 120, size: 8, targetLoot: null
 };
 
-// Генерация стартовых турелей
 function createTurrets() {
     const offset = citadel.size / 2 - 10;
+    // maxCooldown изменен с 3000 на 2000
     return [
-        { x: citadel.x - offset, y: citadel.y - offset, range: 120, maxCooldown: 3000, charge: 0, damage: 10, cost: { range: 10, speed: 10, damage: 10 } },
-        { x: citadel.x + offset, y: citadel.y - offset, range: 120, maxCooldown: 3000, charge: 0, damage: 10, cost: { range: 10, speed: 10, damage: 10 } },
-        { x: citadel.x - offset, y: citadel.y + offset, range: 120, maxCooldown: 3000, charge: 0, damage: 10, cost: { range: 10, speed: 10, damage: 10 } },
-        { x: citadel.x + offset, y: citadel.y + offset, range: 120, maxCooldown: 3000, charge: 0, damage: 10, cost: { range: 10, speed: 10, damage: 10 } }
+        { x: citadel.x - offset, y: citadel.y - offset, range: 120, maxCooldown: 2000, charge: 0, damage: 10, angle: Math.PI + Math.PI/4, cost: { range: 10, speed: 10, damage: 10 } },
+        { x: citadel.x + offset, y: citadel.y - offset, range: 120, maxCooldown: 2000, charge: 0, damage: 10, angle: -Math.PI/4, cost: { range: 10, speed: 10, damage: 10 } },
+        { x: citadel.x - offset, y: citadel.y + offset, range: 120, maxCooldown: 2000, charge: 0, damage: 10, angle: Math.PI - Math.PI/4, cost: { range: 10, speed: 10, damage: 10 } },
+        { x: citadel.x + offset, y: citadel.y + offset, range: 120, maxCooldown: 2000, charge: 0, damage: 10, angle: Math.PI/4, cost: { range: 10, speed: 10, damage: 10 } }
     ];
 }
 
@@ -132,7 +132,7 @@ function loadGame() {
         resources = data.resources;
         citadel.hp = data.hp;
         turrets = data.turrets;
-        gameState = data.gameState === "GAME_OVER" ? "WAITING" : data.gameState; // защита от мертвого сейва
+        gameState = data.gameState === "GAME_OVER" ? "WAITING" : data.gameState; 
         timers = data.timers;
         zombies = []; bullets = []; loots = [];
         survivor.x = citadel.x; survivor.y = citadel.y;
@@ -147,18 +147,17 @@ function togglePause() {
     if (gameState === "GAME_OVER") return;
     isPaused = !isPaused;
     document.getElementById("pause-btn").innerText = isPaused ? "Продолжить" : "Пауза";
-    lastTime = performance.now(); // сброс дельты, чтобы избежать рывков после снятия с паузы
+    lastTime = performance.now(); 
 }
 
 function repairWall() {
     if (resources.bones >= 1 && citadel.hp < citadel.maxHp && gameState !== "GAME_OVER") {
         resources.bones--;
-        citadel.hp = Math.min(citadel.maxHp, citadel.hp + 15);
+        citadel.hp = Math.min(citadel.maxHp, citadel.hp + 10); // Исправлено на 10 HP
         updateUI();
     }
 }
 
-// --- КЛИКИ И АПГРЕЙДЫ ---
 canvas.addEventListener('mousedown', (e) => {
     if (gameState === "GAME_OVER") return;
     const rect = canvas.getBoundingClientRect();
@@ -166,7 +165,6 @@ canvas.addEventListener('mousedown', (e) => {
     const my = e.clientY - rect.top;
 
     turrets.forEach(t => {
-        // Проверка клика по турели
         if (Math.hypot(t.x - mx, t.y - my) < 20) {
             selectedTurret = t;
             showUpgradeMenu();
@@ -219,7 +217,6 @@ function buyUpgrade(type) {
     }
 }
 
-// --- ИГРОВАЯ ЛОГИКА ---
 function spawnZombie() {
     let x, y;
     const edge = Math.floor(Math.random() * 4);
@@ -257,12 +254,10 @@ function updateGame(dt) {
         return;
     }
 
-    // Логика фаз
     if (gameState === "WAITING") {
         timers.waveWait -= dt;
         if (timers.waveWait <= 0) {
             gameState = "WAVE";
-            // Вычисляем количество зомби: +10% за каждую волну
             zombiesToSpawn = Math.floor(baseZombies * Math.pow(1.1, waveNumber - 1));
             timers.spawn = 0;
         }
@@ -285,7 +280,6 @@ function updateGame(dt) {
         }
     }
 
-    // Зомби: движение и атака стен
     const wallRadius = citadel.size / 2 + citadel.wallThickness / 2;
     for (let i = zombies.length - 1; i >= 0; i--) {
         let z = zombies[i];
@@ -294,49 +288,54 @@ function updateGame(dt) {
         let dist = Math.hypot(dx, dy);
 
         if (dist > wallRadius + z.size) {
-            // Идет к цитадели
             z.x += (dx / dist) * z.speed * (dt / 1000);
+            z.y += (dy / dist) * z.speed * (dt / 1000); // ИСПРАВЛЕНО: добавил движение по оси Y
         } else {
-            // Ломает стену
             z.attackTimer += dt;
-            if (z.attackTimer >= 1000) { // Удар раз в секунду
+            if (z.attackTimer >= 1000) { 
                 citadel.hp -= 2; 
                 z.attackTimer = 0;
             }
         }
     }
 
-    // Турели: зарядка и стрельба
-    if (gameState === "WAVE" && zombies.length > 0) {
-        turrets.forEach(t => {
+    // Турели
+    turrets.forEach(t => {
+        // Поиск ближайшей цели (даже если не заряжена пушка, чтобы ствол следил за целью)
+        let target = null;
+        let minDist = t.range;
+        if (gameState === "WAVE" && zombies.length > 0) {
+            zombies.forEach(z => {
+                let d = Math.hypot(z.x - t.x, z.y - t.y);
+                if (d <= minDist) { minDist = d; target = z; }
+            });
+        }
+
+        // Поворот ствола за целью
+        if (target) {
+            t.angle = Math.atan2(target.y - t.y, target.x - t.x);
+        }
+
+        // Зарядка и стрельба
+        if (gameState === "WAVE") {
             if (t.charge < t.maxCooldown) {
                 t.charge += dt;
-            } else {
-                // Поиск цели в радиусе
-                let target = null;
-                let minDist = t.range;
-                zombies.forEach(z => {
-                    let d = Math.hypot(z.x - t.x, z.y - t.y);
-                    if (d <= minDist) { minDist = d; target = z; }
+            } else if (target) {
+                let tx = target.x - t.x;
+                let ty = target.y - t.y;
+                let tDist = Math.hypot(tx, ty);
+                bullets.push({
+                    x: t.x + Math.cos(t.angle) * 12, // пуля вылетает из дула
+                    y: t.y + Math.sin(t.angle) * 12, 
+                    vx: (tx / tDist) * 400, vy: (ty / tDist) * 400, damage: t.damage
                 });
-
-                if (target) {
-                    let tx = target.x - t.x;
-                    let ty = target.y - t.y;
-                    let tDist = Math.hypot(tx, ty);
-                    bullets.push({
-                        x: t.x, y: t.y, vx: (tx / tDist) * 400, vy: (ty / tDist) * 400, damage: t.damage
-                    });
-                    t.charge = 0; // Сброс шкалы после выстрела
-                }
+                t.charge = 0; 
             }
-        });
-    } else {
-        // Вне боя пушки заряжены на максимум
-        turrets.forEach(t => t.charge = t.maxCooldown);
-    }
+        } else {
+            t.charge = t.maxCooldown;
+        }
+    });
 
-    // Пули
     for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         b.x += b.vx * (dt / 1000);
@@ -349,7 +348,6 @@ function updateGame(dt) {
                 z.hp -= b.damage;
                 hit = true;
                 if (z.hp <= 0) {
-                    // Выпадение лута
                     let rand = Math.random();
                     let type = "gold";
                     if (rand > 0.4 && rand <= 0.7) type = "slime";
@@ -367,7 +365,6 @@ function updateGame(dt) {
         }
     }
 
-    // Выживший: авто-сбор
     if (gameState === "LOOTING") {
         if (loots.length === 0) {
             let dx = citadel.x - survivor.x;
@@ -407,7 +404,6 @@ function updateGame(dt) {
             }
         }
     } else {
-        // Возврат в центр
         let dx = citadel.x - survivor.x;
         let dy = citadel.y - survivor.y;
         let dist = Math.hypot(dx, dy);
@@ -423,13 +419,11 @@ function updateGame(dt) {
 function drawGame() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Радиус пушек (бледный круг при наведении/всегда)
     turrets.forEach(t => {
         ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
         ctx.beginPath(); ctx.arc(t.x, t.y, t.range, 0, Math.PI*2); ctx.fill();
     });
 
-    // Стены цитадели (меняют цвет при уроне)
     let wallHealthRatio = citadel.hp / citadel.maxHp;
     ctx.fillStyle = "#333";
     ctx.fillRect(citadel.x - citadel.size/2, citadel.y - citadel.size/2, citadel.size, citadel.size);
@@ -438,23 +432,42 @@ function drawGame() {
     ctx.lineWidth = citadel.wallThickness;
     ctx.strokeRect(citadel.x - citadel.size/2, citadel.y - citadel.size/2, citadel.size, citadel.size);
 
-    // Турели и их зарядка
+    // Новая отрисовка турелей с вращением
     turrets.forEach(t => {
-        // Основа пушки
-        ctx.fillStyle = t === selectedTurret ? "#aaa" : "#777";
-        ctx.fillRect(t.x - 8, t.y - 8, 16, 16);
-        ctx.fillStyle = "#111";
-        ctx.fillRect(t.x - 4, t.y - 4, 8, 8);
+        ctx.save();
+        ctx.translate(t.x, t.y);
+        ctx.rotate(t.angle); // Поворачиваем холст по углу турели
+
+        // База пушки
+        ctx.fillStyle = "#444";
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ствол
+        ctx.fillStyle = "#777";
+        ctx.fillRect(0, -3, 16, 6);
+        ctx.strokeStyle = "#111";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0, -3, 16, 6);
+
+        // Окантовка (желтая, если выбрана)
+        ctx.strokeStyle = t === selectedTurret ? "#ffd700" : "#222";
+        ctx.lineWidth = t === selectedTurret ? 2 : 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore(); // Возвращаем холст в исходное состояние
         
-        // Полоска зарядки (от 0 до 1)
+        // Полоска зарядки (не вращается, всегда внизу)
         let chargeRatio = t.charge / t.maxCooldown;
         ctx.fillStyle = "#222";
-        ctx.fillRect(t.x - 10, t.y + 12, 20, 4);
+        ctx.fillRect(t.x - 10, t.y + 14, 20, 4);
         ctx.fillStyle = chargeRatio >= 1 ? "#00ff00" : "#ffdd44";
-        ctx.fillRect(t.x - 10, t.y + 12, 20 * chargeRatio, 4);
+        ctx.fillRect(t.x - 10, t.y + 14, 20 * chargeRatio, 4);
     });
 
-    // Лут
     loots.forEach(item => {
         if (item.type === "gold") ctx.fillStyle = "#ffd700";
         else if (item.type === "slime") ctx.fillStyle = "#32cd32";
@@ -462,12 +475,10 @@ function drawGame() {
         ctx.beginPath(); ctx.arc(item.x, item.y, 5, 0, Math.PI*2); ctx.fill();
     });
 
-    // Зомби
     zombies.forEach(z => {
         ctx.fillStyle = "#5d7a42";
         ctx.beginPath(); ctx.arc(z.x, z.y, z.size, 0, Math.PI*2); ctx.fill();
         
-        // ХП Зомби
         let hpRatio = z.hp / z.maxHp;
         ctx.fillStyle = "red";
         ctx.fillRect(z.x - 8, z.y - 15, 16, 3);
@@ -475,17 +486,15 @@ function drawGame() {
         ctx.fillRect(z.x - 8, z.y - 15, 16 * hpRatio, 3);
     });
 
-    // Выживший
     ctx.fillStyle = "#00bcd4";
     ctx.beginPath(); ctx.arc(survivor.x, survivor.y, survivor.size, 0, Math.PI*2); ctx.fill();
 
-    // Пули
     bullets.forEach(b => {
         ctx.fillStyle = "#ffdd44";
-        ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+        // Делаем пулю чуть длиннее (трассер)
+        ctx.fillRect(b.x - 3, b.y - 3, 6, 6); 
     });
 
-    // Отрисовка паузы
     if (isPaused && gameState !== "GAME_OVER") {
         ctx.fillStyle = "rgba(0,0,0,0.5)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -495,7 +504,6 @@ function drawGame() {
     }
 }
 
-// --- ОСНОВНОЙ ЦИКЛ ---
 function gameLoop(timestamp) {
     let dt = timestamp - lastTime;
     lastTime = timestamp;
