@@ -16,12 +16,27 @@
         .epic-controls button { padding: 8px 15px; font-weight: bold; cursor: pointer; border: none; border-radius: 4px; color: white; }
         .epic-controls button:disabled { background: #333 !important; color: #777 !important; cursor: not-allowed; }
 
-        #game-container { position: relative; width: 800px; margin: 20px auto; }
-        canvas { background: #343434; display: block; border: 4px solid #555; cursor: crosshair; }
+        #game-container { position: relative; width: 800px; margin: 20px auto 0 auto; }
+        canvas { background: #343434; display: block; border: 4px solid #555; cursor: crosshair; border-bottom: none; }
+        
+        /* Нижняя панель для паузы */
+        .bottom-panel { display: flex; justify-content: center; align-items: center; padding: 15px; background: #111; width: 800px; margin: 0 auto; border: 4px solid #555; border-top: 1px solid #444; box-sizing: border-box; }
+        .bottom-panel button { padding: 10px 30px; font-size: 16px; font-weight: bold; cursor: pointer; background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; }
+        .bottom-panel button:hover { background: #555; }
+
+        /* Кнопка-ящик Автосбора внутри Цитадели */
+        #do-autoloot-btn {
+            display: none; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, 30px); /* Смещение чуть ниже центра */
+            background: #ff9800; color: #fff; font-weight: bold; font-size: 11px;
+            border: 2px solid #e65100; border-radius: 4px; padding: 4px 6px; cursor: pointer;
+            box-shadow: 0px 0px 10px rgba(255, 152, 0, 0.5); z-index: 10;
+        }
+        #do-autoloot-btn:hover { background: #e65100; }
         
         #upgrade-menu {
             display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9); border: 2px solid #777; padding: 20px; border-radius: 8px; text-align: center;
+            background: rgba(0, 0, 0, 0.9); border: 2px solid #777; padding: 20px; border-radius: 8px; text-align: center; z-index: 20;
         }
         #upgrade-menu h3 { margin-top: 0; color: #ffd700; }
         .upg-btn { display: block; width: 100%; margin: 10px 0; padding: 10px; background: #444; color: #fff; border: 1px solid #777; cursor: pointer; }
@@ -30,7 +45,7 @@
         
         #game-over {
             display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(150, 0, 0, 0.5); color: white; text-align: center; align-content: center; font-size: 30px; font-weight: bold;
+            background: rgba(150, 0, 0, 0.5); color: white; text-align: center; align-content: center; font-size: 30px; font-weight: bold; z-index: 30;
         }
     </style>
 </head>
@@ -52,9 +67,7 @@
                 <button onclick="setSpeed(5)" id="btn-s5" class="speed-btn">x5</button>
                 <button onclick="setSpeed(10)" id="btn-s10" class="speed-btn">x10</button>
             </span>
-            <button id="do-autoloot-btn" onclick="doAutoLoot()" style="display:none; background:#ff9800; color:#fff; font-weight:bold;">🧲 Собрать весь лут</button>
             <button onclick="repairWall()" id="repair-btn" title="1 кость = 100 HP">Чинить стену (1 кость = 100 HP)</button>
-            <button onclick="togglePause()" id="pause-btn">Пауза</button>
             <button onclick="saveGame()">Сохранить</button>
             <button onclick="loadGame()">Загрузить</button>
         </div>
@@ -64,7 +77,7 @@
         <button id="heli-status-btn" disabled style="background:#555;">🚁 Ждем 3-ю волну...</button>
         
         <button id="heli-specops-btn" onclick="buySpecOps()" style="display:none; background:#28a745;">🚁 Рация Спецназа (100 Слизи)</button>
-        <button id="heli-autoloot-btn" onclick="buyAutoLoot()" style="display:none; background:#ff9800;">🚁 Автосбор (500 Слизи)</button>
+        <button id="heli-autoloot-btn" onclick="buyAutoLoot()" style="display:none; background:#ff9800;">🚁 Девайс Сбора (500 Слизи)</button>
         <button id="heli-shield-btn" onclick="buyShield()" style="display:none; background:#00bcd4;">🚁 Броня +1000 (1000 Слизи)</button>
 
         <button id="spec-ops-btn" onclick="useSpecOps()" disabled style="background:#dc3545;">🔫 Вызвать Спецназ (0)</button>
@@ -73,6 +86,7 @@
 
     <div id="game-container">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <button id="do-autoloot-btn" onclick="doAutoLoot()" title="Магнитный сбор">🧲 СБОР</button>
         
         <div id="upgrade-menu">
             <h3>Улучшение турели</h3>
@@ -83,6 +97,10 @@
         </div>
 
         <div id="game-over">ЦИТАДЕЛЬ ПАЛА<br><span style="font-size: 20px; cursor: pointer; text-decoration: underline;" onclick="location.reload()">Начать заново</span></div>
+    </div>
+    
+    <div class="bottom-panel">
+        <button onclick="togglePause()" id="pause-btn">Пауза</button>
     </div>
 
 <script>
@@ -179,7 +197,6 @@ function loadGame() {
         zombies = []; bullets = []; loots = [];
         survivor.x = citadel.x; survivor.y = citadel.y;
         
-        // Прячем экран окончания игры, если он был
         document.getElementById("game-over").style.display = "none";
         
         updateUI();
@@ -188,7 +205,6 @@ function loadGame() {
     }
 }
 
-// Покупки у Яйцеголовых
 function buySpecOps() {
     if (isHeliAvailable() && resources.slime >= 100) {
         resources.slime -= 100;
@@ -213,14 +229,16 @@ function buyShield() {
     }
 }
 
+// Запуск анимации магнита
 function doAutoLoot() {
     if (!hasAutoLoot || loots.length === 0) return;
     
     loots.forEach(item => {
-        resources[item.type]++;
+        if (!item.isMagnetized) {
+            item.isMagnetized = true;
+            item.magnetSpeed = 50; // Начальная скорость притяжения
+        }
     });
-    loots = [];
-    updateUI();
 }
 
 function useSpecOps() {
@@ -324,7 +342,7 @@ function spawnZombie() {
 
     let zHp = Math.round(50 * Math.pow(1.01, waveNumber - 1));
     let baseSpeed = 7.5 + Math.random() * 5;
-    let zSpeed = baseSpeed * Math.pow(1.02, waveNumber - 1); // Вернул 1.02, чтобы совпадало с эталоном
+    let zSpeed = baseSpeed * Math.pow(1.02, waveNumber - 1); 
 
     zombies.push({
         x: x, y: y, hp: zHp, maxHp: zHp, 
@@ -346,8 +364,9 @@ function updateUI() {
     else if (gameState === "WAVE") statusEl.innerText = `Врагов: ${zombies.length + zombiesToSpawn}`;
     else if (gameState === "LOOTING") statusEl.innerText = `Сбор лута...`;
 
-    // UI Автосбора и Щита
-    document.getElementById("do-autoloot-btn").style.display = hasAutoLoot ? "inline-block" : "none";
+    // Ящик автосбора
+    document.getElementById("do-autoloot-btn").style.display = hasAutoLoot ? "block" : "none";
+    
     if (citadelShield > 0) {
         document.getElementById("shield-ui").style.display = "inline";
         document.getElementById("shield-hp").innerText = citadelShield;
@@ -355,7 +374,6 @@ function updateUI() {
         document.getElementById("shield-ui").style.display = "none";
     }
 
-    // Меню Вертолета
     let btnStatus = document.getElementById("heli-status-btn");
     let btnSpec = document.getElementById("heli-specops-btn");
     let btnLoot = document.getElementById("heli-autoloot-btn");
@@ -476,7 +494,6 @@ function updateGame(dt) {
         } else {
             z.attackTimer += dt;
             if (z.attackTimer >= 1000) { 
-                // Логика урона по Щиту
                 if (citadelShield > 0) {
                     citadelShield -= 1;
                 } else {
@@ -549,8 +566,33 @@ function updateGame(dt) {
         }
     }
 
+    // Физика магнита: предметы летят к выжившему с ускорением!
+    for (let i = loots.length - 1; i >= 0; i--) {
+        let item = loots[i];
+        if (item.isMagnetized) {
+            let dx = survivor.x - item.x;
+            let dy = survivor.y - item.y;
+            let dist = Math.hypot(dx, dy);
+            
+            // Ускоряем притяжение со временем
+            item.magnetSpeed += 1200 * (dt / 1000); 
+            let moveDist = item.magnetSpeed * (dt / 1000);
+            
+            if (dist <= moveDist + 5) { // Предмет достиг цели
+                resources[item.type]++;
+                loots.splice(i, 1);
+            } else {
+                item.x += (dx / dist) * moveDist;
+                item.y += (dy / dist) * moveDist;
+            }
+        }
+    }
+
+    // Логика обычного ручного сбора
     if (gameState === "LOOTING") {
-        if (loots.length === 0) {
+        let activeLoots = loots.filter(l => !l.isMagnetized); // Игнорируем намагниченный лут
+        
+        if (activeLoots.length === 0) {
             let dx = citadel.x - survivor.x;
             let dy = citadel.y - survivor.y;
             let dist = Math.hypot(dx, dy);
@@ -564,9 +606,11 @@ function updateGame(dt) {
                 updateUI();
             }
         } else {
-            if (!survivor.targetLoot || !loots.includes(survivor.targetLoot)) {
+            // Если текущая цель была подобрана или намагничена, ищем новую
+            if (!survivor.targetLoot || !loots.includes(survivor.targetLoot) || survivor.targetLoot.isMagnetized) {
                 let minDist = Infinity;
-                loots.forEach(item => {
+                survivor.targetLoot = null;
+                activeLoots.forEach(item => {
                     let d = Math.hypot(item.x - survivor.x, item.y - survivor.y);
                     if (d < minDist) { minDist = d; survivor.targetLoot = item; }
                 });
@@ -619,7 +663,6 @@ function drawGame() {
     ctx.lineWidth = citadel.wallThickness + (citadelUpgradeLevel * 2); 
     ctx.strokeRect(citadel.x - citadel.size/2, citadel.y - citadel.size/2, citadel.size, citadel.size);
 
-    // Отрисовка Энергощита (если куплен)
     if (citadelShield > 0) {
         ctx.strokeStyle = "rgba(0, 255, 255, 0.6)";
         ctx.lineWidth = 4;
@@ -629,7 +672,7 @@ function drawGame() {
 
     if (isHeliAvailable()) {
         ctx.save();
-        ctx.translate(citadel.x, citadel.y - citadel.size / 2 - 45); // Чуть отодвинул вверх из-за щита
+        ctx.translate(citadel.x, citadel.y - citadel.size / 2 - 45); 
         
         ctx.strokeStyle = "#777";
         ctx.lineWidth = 3;
