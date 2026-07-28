@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#7bc043">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Ферма Антоши">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="farmAnton.png">
+    <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22%D0%A4%D0%B5%D1%80%D0%BC%D0%B0%20%D0%90%D0%BD%D1%82%D0%BE%D1%88%D0%B8%202.0%22%2C%22short_name%22%3A%22%D0%A4%D0%B5%D1%80%D0%BC%D0%B0%22%2C%22start_url%22%3A%22.%2Fferma2.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%238bc34a%22%2C%22theme_color%22%3A%22%237bc043%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22farmAnton.png%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fpng%22%2C%22purpose%22%3A%22any%20maskable%22%7D%2C%7B%22src%22%3A%22farmAnton.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%2C%22purpose%22%3A%22any%20maskable%22%7D%5D%7D">
+    <title>Ферма Антоши 2.0 🏆</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background-color: #8bc34a; background-image: url('farmAnton.png');
+            background-size: cover; background-position: center; background-attachment: fixed;
+            color: #333; display: flex; flex-direction: column; align-items: center; padding: 10px; 
+        }
+        
+        .system-controls { display: flex; gap: 5px; width: 100%; max-width: 440px; margin-bottom: 8px; justify-content: space-between; }
+        .sys-btn { flex: 1; background: rgba(255,255,255,0.9); border: 2px solid #ccc; padding: 6px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; color: #555; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: 0.2s; }
+        .sys-btn:active { transform: translateY(2px); box-shadow: none; }
+        .sys-btn.active-pause { background: #ff5252; color: white; border-color: #d50000; }
+        .sys-btn.active-music { background: #4caf50; color: white; border-color: #2e7d32; }
+
+        header { background: rgba(123, 192, 67, 0.95); color: white; padding: 12px; border-radius: 15px; width: 100%; max-width: 440px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 8px; }
+        .stats { font-size: 22px; font-weight: bold; }
+        
+        .tips-bar {
+            width: 100%; max-width: 440px; background: rgba(255,255,255,0.92); border: 2px solid #ffb74d;
+            border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; font-size: 13px; color: #5d4037;
+            display: flex; align-items: center; gap: 8px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .tips-bar .tip-icon { font-size: 18px; }
+        .tips-bar .tip-text { flex: 1; line-height: 1.3; }
+
+        .active-helpers { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; max-width: 440px; margin-bottom: 8px; justify-content: center; min-height: 32px; }
+        .helper-badge { background: #fff3e0; border: 2px solid #ffb74d; border-radius: 10px; padding: 4px 8px; display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: bold; position: relative; }
+        .helper-badge.water { background: #e3f2fd; border-color: #64b5f6; }
+        .helper-badge.pioneers { background: #ffebee; border-color: #ef5350; }
+        .helper-badge.booster { background: #d7ccc8; border-color: #8d6e63; }
+        .helper-badge.insurance { background: #e8f5e9; border-color: #4caf50; }
+        .fire-btn { background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; line-height: 16px; text-align: center; cursor: pointer; position: absolute; right: -5px; top: -5px; }
+        
+        .area-nav { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 440px; margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px 10px; border-radius: 10px; font-weight: bold; }
+        .nav-btn { background: #7bc043; border: none; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+        .nav-btn:disabled { background: #ccc; }
+
+        .farm-container { position: relative; width: 100%; max-width: 440px; margin-bottom: 8px; }
+        .farm-zone { background: rgba(141, 110, 99, 0.95); padding: 10px; border-radius: 15px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; box-shadow: inset 0 5px 10px rgba(0,0,0,0.4); transition: 0.3s; }
+        
+        @keyframes flashRed {
+            0% { box-shadow: inset 0 0 20px rgba(255,0,0,0.8); background-color: rgba(255,0,0,0.3); }
+            50% { box-shadow: inset 0 0 50px rgba(255,0,0,1); background-color: rgba(255,0,0,0.6); }
+            100% { box-shadow: inset 0 0 20px rgba(255,0,0,0.8); background-color: rgba(141, 110, 99, 0.95); }
+        }
+        .flash-red { animation: flashRed 0.5s infinite; }
+
+        .pause-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); color: white; border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; z-index: 50; display: none; backdrop-filter: blur(2px); }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; display: none; padding: 20px; }
+        .modal-box { background: white; padding: 20px; border-radius: 15px; max-width: 400px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .modal-title { font-size: 22px; font-weight: bold; margin-bottom: 10px; color: #d32f2f; }
+        .modal-text { font-size: 15px; margin-bottom: 20px; color: #444; }
+        .modal-btn { background: #ff9800; border: none; padding: 10px 20px; font-size: 16px; font-weight: bold; color: white; border-radius: 8px; cursor: pointer; box-shadow: 0 4px #e65100; }
+        .modal-btn:active { transform: translateY(4px); box-shadow: 0 0 #e65100; }
+
+        .plot { background: #5d4037; aspect-ratio: 1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; cursor: pointer; border: 2px solid #4e342e; }
+        .plot.locked { background: #3e2723; border-color: #261411; }
+        .plot.obstacle { background: #78909c; border-color: #455a64; }
+        
+        .plot .crop-label { font-size: 9px; position: absolute; top: 2px; color: white; background: rgba(0,0,0,0.5); padding: 1px 3px; border-radius: 3px; z-index: 3; max-width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; }
+        .plot .emoji { font-size: 24px; z-index: 2; margin-top: 5px; }
+        .plot .ghost-seed { position: absolute; opacity: 0.3; pointer-events: none; transform: scale(0.9); }
+        .plot .timer { font-size: 9px; background: rgba(0,0,0,0.7); color: white; padding: 1px 3px; border-radius: 3px; position: absolute; bottom: 2px; z-index: 4; }
+        .plot .price-tag { font-size: 9px; color: #ffeb3b; font-weight: bold; position: absolute; bottom: 2px; background: rgba(0,0,0,0.6); padding: 1px 3px; border-radius: 3px; }
+        
+        .pest { position: absolute; font-size: 24px; z-index: 5; display: flex; flex-direction: column; align-items: center; }
+        .pest-hp { font-size: 10px; background: red; color: white; border-radius: 4px; padding: 0 4px; margin-top: -5px; font-weight: bold; }
+        
+        .buy-area-btn { background: #ff4081; width: 100%; max-width: 440px; padding: 10px; color: white; border: none; border-radius: 10px; font-weight: bold; margin-bottom: 10px; box-shadow: 0 3px #c51162; display: none; cursor: pointer; }
+        .buy-area-btn:active { transform: translateY(2px); box-shadow: none; }
+
+        .shop { background: rgba(255,255,255,0.95); width: 100%; max-width: 440px; border-radius: 15px; padding: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        .tabs { display: flex; gap: 5px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 5px; }
+        .tab-btn { flex: 0 0 auto; padding: 6px 10px; border: none; background: #e0e0e0; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 12px; }
+        .tab-btn.active { background: #7bc043; color: white; }
+
+        .market-section { display: none; flex-direction: column; gap: 6px; max-height: 35vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 5px; }
+        .market-section.active { display: flex; }
+        .shop-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border: 2px solid #f0f0f0; border-radius: 8px; background: #fafafa; font-size: 13px; cursor: pointer; }
+        .shop-item.selected { border-color: #7bc043; background: #e8f5e9; }
+        .item-info { display: flex; align-items: center; gap: 8px; }
+
+        .btn { background: #ffb347; border: none; padding: 6px 12px; font-size: 12px; font-weight: bold; color: white; border-radius: 8px; cursor: pointer; box-shadow: 0 3px #cc8e39; }
+        .btn:active { transform: translateY(2px); box-shadow: 0 1px #cc8e39; }
+        .btn:disabled { background: #ccc !important; box-shadow: none; cursor: not-allowed; color: #666; }
+
+        /* Tooltip styles */
+        [title] { position: relative; }
+        .install-hint {
+            width: 100%; max-width: 440px; background: #e3f2fd; border: 2px solid #2196f3; border-radius: 10px;
+            padding: 8px 12px; margin-bottom: 8px; font-size: 12px; color: #0d47a1; text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="bg-music"></audio>
+
+    <div class="system-controls">
+        <button class="sys-btn" id="btn-pause" onclick="togglePause()" title="Поставить игру на паузу / снять с паузы">⏸ Пауза</button>
+        <button class="sys-btn" onclick="saveGame()" title="Сохранить прогресс в браузере">💾 Сохранить</button>
+        <button class="sys-btn" onclick="loadGame()" title="Загрузить последнее сохранение">📂 Загрузить</button>
+        <button class="sys-btn" id="btn-music" onclick="toggleMusic()" title="Включить / выключить фоновую музыку">🎵 Музыка</button>
+    </div>
+
+    <header>
+        <div class="stats">Монеты: <span id="money-display">10</span> 🪙</div>
+    </header>
+
+    <div class="tips-bar" id="tips-bar" onclick="nextTip()" title="Нажми, чтобы сменить совет">
+        <span class="tip-icon">💡</span>
+        <span class="tip-text" id="tip-text">Выбери семена в магазине ниже, потом тапни по коричневой грядке!</span>
+    </div>
+
+    <div class="install-hint" id="install-hint">
+        📱 Чтобы поставить как приложение: в Chrome → меню ⋮ → «Добавить на главный экран» / «Установить приложение»
+    </div>
+
+    <div class="active-helpers" id="helpers-panel"></div>
+
+    <div class="area-nav">
+        <button class="nav-btn" id="prev-area" onclick="changeArea(-1)" title="Предыдущий участок">◀</button>
+        <span id="area-title">Участок 1 (Овощи)</span>
+        <button class="nav-btn" id="next-area" onclick="changeArea(1)" title="Следующий участок">▶</button>
+    </div>
+
+    <div class="farm-container">
+        <div class="pause-overlay" id="pause-screen">⏸ ПАУЗА</div>
+        <div class="farm-zone" id="farm-grid"></div>
+    </div>
+    
+    <button class="buy-area-btn" id="buy-area-btn" onclick="buyNewArea()">Купить участок</button>
+
+    <div class="shop">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('seeds')" title="Обычные овощи и ягоды">🌱 Семена</button>
+            <button class="tab-btn" onclick="switchTab('trees')" title="Деревья и кустарники (сад)">🌳 Сад</button>
+            <button class="tab-btn" onclick="switchTab('services')" title="Помощники, полив, удобрения">👷 Услуги</button>
+            <button class="tab-btn" onclick="switchTab('upgrades')" title="Постоянные улучшения">🚀 Апгрейды</button>
+        </div>
+        
+        <div class="market-section active" id="sec-seeds"></div>
+        <div class="market-section" id="sec-trees"></div>
+        
+        <div class="market-section" id="sec-services">
+            <div class="shop-item" title="Страховка: при стихии получишь ×3 от потери. Длится 90 секунд.">
+                <div class="item-info"><span style="font-size:20px">🛡️</span><div><strong>Страховка</strong><br><small>Выплата ×3 при стихии (1.5м)</small></div></div>
+                <button class="btn" id="btn-ins" onclick="buyService('insurance')"></button>
+            </div>
+            <div class="shop-item" title="Рабочий сам сажает выбранные сейчас семена и собирает урожай 15 минут.">
+                <div class="item-info"><span style="font-size:20px">👷‍♂️</span><div><strong>Рабочий</strong><br><small>Сажает выбранное и собирает (15м)</small></div></div>
+                <button class="btn" id="btn-srv-worker" onclick="buyService('worker')"></button>
+            </div>
+            <div class="shop-item" title="Охотник автоматически убивает кротов и зайцев 10 минут (дольше с апгрейдами).">
+                <div class="item-info"><span style="font-size:20px">🤠</span><div><strong>Охотник</strong><br><small>Защита от кротов/зайцев (10м)</small></div></div>
+                <button class="btn" id="btn-srv-hunter" onclick="buyService('hunter')"></button>
+            </div>
+            <div class="shop-item" title="Пионеры собирают улиток автоматически 10 минут.">
+                <div class="item-info"><span style="font-size:20px">👦👧</span><div><strong>Пионеры</strong><br><small>Собирают улиток (10м)</small></div></div>
+                <button class="btn" id="btn-srv-pioneers" onclick="buyService('pioneers')"></button>
+            </div>
+            <div class="shop-item" title="Лейка ускоряет рост на +5% на 5 минут.">
+                <div class="item-info"><span style="font-size:20px">🚿</span><div><strong>Лейка</strong><br><small>+5% к скорости (5м)</small></div></div>
+                <button class="btn" id="btn-wat-can" onclick="buyService('can')"></button>
+            </div>
+            <div class="shop-item" title="Шланг ускоряет рост на +10% на 10 минут.">
+                <div class="item-info"><span style="font-size:20px">💦</span><div><strong>Шланг</strong><br><small>+10% к скорости (10м)</small></div></div>
+                <button class="btn" id="btn-wat-hose" onclick="buyService('hose')"></button>
+            </div>
+            <div class="shop-item" title="Капельница ускоряет рост (базово +20%, с апгрейдами до +50%) на 20 минут.">
+                <div class="item-info"><span style="font-size:20px">💧</span><div><strong>Капельница</strong><br><small>Ускорение на 20м</small></div></div>
+                <button class="btn" id="btn-wat-drip" onclick="buyService('drip')"></button>
+            </div>
+            <div class="shop-item" title="Навоз: рост ×3, но вредители появляются чаще (×2). 3 минуты.">
+                <div class="item-info"><span style="font-size:20px">💩</span><div><strong>Навоз</strong><br><small>Рост ×3, вредители ×2 (3м)</small></div></div>
+                <button class="btn" id="btn-bst-manure" onclick="buyService('manure')"></button>
+            </div>
+            <div class="shop-item" title="Супер Навоз: рост ×6, вредители ×4. 5 минут. Мощно, но рискованно.">
+                <div class="item-info"><span style="font-size:20px">☢️</span><div><strong>Супер Навоз</strong><br><small>Рост ×6, вредители ×4 (5м)</small></div></div>
+                <button class="btn" id="btn-bst-super" onclick="buyService('super_manure')"></button>
+            </div>
+        </div>
+        
+        <div class="market-section" id="sec-upgrades">
+            <div class="shop-item" title="Капельница даёт +30% вместо +20%.">
+                <div class="item-info"><span style="font-size:20px">⚙️</span><div><strong>Полу-робот капельница</strong><br><small>Капельный полив даёт +30%</small></div></div>
+                <button class="btn" id="upg-drip-1" onclick="buyUpgrade('drip', 1)"></button>
+            </div>
+            <div class="shop-item" title="Капельница даёт +40%.">
+                <div class="item-info"><span style="font-size:20px">🤖</span><div><strong>Робот капельница</strong><br><small>Капельный полив даёт +40%</small></div></div>
+                <button class="btn" id="upg-drip-2" onclick="buyUpgrade('drip', 2)"></button>
+            </div>
+            <div class="shop-item" title="Капельница даёт +50%.">
+                <div class="item-info"><span style="font-size:20px">🧠</span><div><strong>AI Полив</strong><br><small>Капельный полив даёт +50%</small></div></div>
+                <button class="btn" id="upg-drip-3" onclick="buyUpgrade('drip', 3)"></button>
+            </div>
+            <div class="shop-item" title="Охотник и пионеры работают в 2 раза дольше.">
+                <div class="item-info"><span style="font-size:20px">⏱️</span><div><strong>Выносливость защитников I</strong><br><small>Команда работает в 2 раза дольше</small></div></div>
+                <button class="btn" id="upg-team-1" onclick="buyUpgrade('team', 1)"></button>
+            </div>
+            <div class="shop-item" title="Охотник и пионеры работают в 3 раза дольше.">
+                <div class="item-info"><span style="font-size:20px">⏱️⚙️</span><div><strong>Выносливость защитников II</strong><br><small>Команда работает в 3 раза дольше</small></div></div>
+                <button class="btn" id="upg-team-2" onclick="buyUpgrade('team', 2)"></button>
+            </div>
+            <div class="shop-item" title="Охотник и пионеры работают в 5 раз дольше.">
+                <div class="item-info"><span style="font-size:20px">⏱️👑</span><div><strong>Выносливость защитников III</strong><br><small>Команда работает в 5 раз дольше</small></div></div>
+                <button class="btn" id="upg-team-3" onclick="buyUpgrade('team', 3)"></button>
+            </div>
+            <div class="shop-item" title="Рабочий собирает ×2 урожая.">
+                <div class="item-info"><span style="font-size:20px">🧺</span><div><strong>Эффективный сбор Рабочего</strong><br><small>Рабочий собирает ×2 урожая</small></div></div>
+                <button class="btn" id="upg-worker-1" onclick="buyUpgrade('worker', 1)"></button>
+            </div>
+            <div class="shop-item" title="Рабочий собирает ×3 урожая.">
+                <div class="item-info"><span style="font-size:20px">🚜</span><div><strong>Промышленный комбайн</strong><br><small>Рабочий собирает ×3 урожая</small></div></div>
+                <button class="btn" id="upg-worker-2" onclick="buyUpgrade('worker', 2)"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="disaster-modal">
+        <div class="modal-box">
+            <div class="modal-title" id="modal-title">ВНИМАНИЕ!</div>
+            <div class="modal-text" id="modal-text">Текст бедствия</div>
+            <button class="modal-btn" onclick="closeDisasterModal()">Понятно, идём работать!</button>
+        </div>
+    </div>
+
+<script>
+    let isPaused = false;
+    let isDisasterActive = false; 
+    let gameState = { money: 10, selectedSeed: 0, currentArea: 0, nextDisasterTime: getNextDisasterTime() };
+
+    // Более мягкие базовые цены
+    const basePrices = {
+        insurance: 50, worker: 100, hunter: 100, pioneers: 30,
+        can: 30, hose: 80, drip: 250, manure: 250, super_manure: 1000,
+        'drip-1': 4000, 'drip-2': 12000, 'drip-3': 40000,
+        'team-1': 2000, 'team-2': 6000, 'team-3': 20000,
+        'worker-1': 10000, 'worker-2': 30000
+    };
+
+    const playlist = ['music1.mp3', 'music2.mp3', 'music3.mp3', 'music4.mp3'];
+    let currentTrackIdx = 0; let isMusicPlaying = false;
+    const musicPlayer = document.getElementById('bg-music');
+
+    musicPlayer.addEventListener('ended', () => {
+        currentTrackIdx = (currentTrackIdx + 1) % playlist.length;
+        musicPlayer.src = playlist[currentTrackIdx];
+        musicPlayer.play().catch(e => console.log("Музыка не найдена"));
+    });
+
+    function toggleMusic() {
+        const musicBtn = document.getElementById('btn-music');
+        if (isMusicPlaying) { 
+            musicPlayer.pause(); isMusicPlaying = false; 
+            musicBtn.classList.remove('active-music'); musicBtn.innerText = "🎵 Музыка"; 
+        } else {
+            if (!musicPlayer.src || musicPlayer.src === "") musicPlayer.src = playlist[currentTrackIdx];
+            musicPlayer.play().then(() => {
+                isMusicPlaying = true; musicBtn.classList.add('active-music'); musicBtn.innerText = "🔇 Выключить";
+            }).catch(e => { alert("Музыка не найдена. Проверьте файлы!"); });
+        }
+    }
+
+    let keyBuffer = '';
+    document.addEventListener('keydown', (e) => {
+        keyBuffer += e.key.toLowerCase();
+        if (keyBuffer.length > 3) keyBuffer = keyBuffer.slice(-3); 
+        if (keyBuffer === 'asd') {
+            gameState.money += 100000;
+            keyBuffer = ''; updateUI(); console.log("+100000 монет");
+        }
+    });
+
+    // Старые культуры + новые. Баланс мягче: быстрее рост, лучше соотношение sell/seed, меньше крутизна в конце
+    const crops = [
+        { id: 0, type: 'veggies', name: "Морковь", emoji: "🥕", seedPrice: 1, sellPrice: 4, time: 40 },
+        { id: 1, type: 'veggies', name: "Репка", emoji: "🧅", seedPrice: 2, sellPrice: 7, time: 55 },
+        { id: 2, type: 'veggies', name: "Картошка", emoji: "🥔", seedPrice: 5, sellPrice: 16, time: 75 },
+        { id: 3, type: 'veggies', name: "Брокколи", emoji: "🥦", seedPrice: 10, sellPrice: 32, time: 95 },
+        { id: 4, type: 'veggies', name: "Кукуруза", emoji: "🌽", seedPrice: 20, sellPrice: 65, time: 120 },
+        { id: 5, type: 'veggies', name: "Помидор", emoji: "🍅", seedPrice: 40, sellPrice: 140, time: 140 },
+        { id: 6, type: 'veggies', name: "Баклажан", emoji: "🍆", seedPrice: 80, sellPrice: 280, time: 160 },
+        { id: 7, type: 'veggies', name: "Тыква", emoji: "🎃", seedPrice: 160, sellPrice: 580, time: 200 },
+        { id: 8, type: 'veggies', name: "Клубника", emoji: "🍓", seedPrice: 320, sellPrice: 1200, time: 240 },
+        { id: 9, type: 'veggies', name: "Арбуз", emoji: "🍉", seedPrice: 600, sellPrice: 2400, time: 280 },
+        // Новые овощи
+        { id: 20, type: 'veggies', name: "Огурец", emoji: "🥒", seedPrice: 900, sellPrice: 3600, time: 320 },
+        { id: 21, type: 'veggies', name: "Перец", emoji: "🌶️", seedPrice: 1400, sellPrice: 5800, time: 360 },
+        { id: 22, type: 'veggies', name: "Капуста", emoji: "🥬", seedPrice: 2200, sellPrice: 9500, time: 400 },
+        { id: 23, type: 'veggies', name: "Горох", emoji: "🫛", seedPrice: 3500, sellPrice: 15500, time: 450 },
+        { id: 24, type: 'veggies', name: "Свёкла", emoji: "🟤", seedPrice: 5000, sellPrice: 23000, time: 500 },
+
+        { id: 10, type: 'trees', name: "Черника", emoji: "🫐", seedPrice: 3000, sellPrice: 11000, time: 400 },
+        { id: 11, type: 'trees', name: "Смородина", emoji: "🍇", seedPrice: 6000, sellPrice: 23000, time: 480 },
+        { id: 12, type: 'trees', name: "Лимон", emoji: "🍋", seedPrice: 14000, sellPrice: 55000, time: 600 },
+        { id: 13, type: 'trees', name: "Апельсин", emoji: "🍊", seedPrice: 28000, sellPrice: 115000, time: 780 },
+        { id: 14, type: 'trees', name: "Вишня", emoji: "🍒", seedPrice: 55000, sellPrice: 230000, time: 960 },
+        { id: 15, type: 'trees', name: "Персик", emoji: "🍑", seedPrice: 120000, sellPrice: 520000, time: 1200 },
+        { id: 16, type: 'trees', name: "Груша", emoji: "🍐", seedPrice: 250000, sellPrice: 1100000, time: 1500 },
+        { id: 17, type: 'trees', name: "Яблоня", emoji: "🍎", seedPrice: 500000, sellPrice: 2300000, time: 2100 },
+        { id: 18, type: 'trees', name: "Кокос", emoji: "🥥", seedPrice: 1200000, sellPrice: 5800000, time: 3000 },
+        { id: 19, type: 'trees', name: "Манго", emoji: "🥭", seedPrice: 2500000, sellPrice: 13000000, time: 4200 },
+        // Новые деревья
+        { id: 25, type: 'trees', name: "Банан", emoji: "🍌", seedPrice: 5000000, sellPrice: 27000000, time: 5400 },
+        { id: 26, type: 'trees', name: "Ананас", emoji: "🍍", seedPrice: 10000000, sellPrice: 55000000, time: 6600 },
+        { id: 27, type: 'trees', name: "Авокадо", emoji: "🥑", seedPrice: 20000000, sellPrice: 115000000, time: 7800 }
+    ];
+
+    const tips = [
+        "Выбери семена в магазине ниже, потом тапни по коричневой грядке!",
+        "Замок 🔒 — купи грядку. Пень/камень — корчуй, чтобы освободить место.",
+        "Рабочий теперь сажает то, что ты выбрал прямо сейчас. Меняй семена — он подстроится!",
+        "Страховка спасает от молнии, наводнения и засухи — даёт ×3 компенсацию.",
+        "Золотой урожай ✨ даёт ×3 монет! Шанс 15%.",
+        "Улиток нужно кликать несколько раз. Кротов и зайцев — один клик или охотник.",
+        "Навоз ускоряет рост, но привлекает больше вредителей. Будь готов!",
+        "Когда все грядки свободны — появится кнопка купить новый участок (сад).",
+        "Апгрейды покупаются на каждый участок отдельно и остаются навсегда.",
+        "Нажми на эту подсказку, чтобы увидеть следующий совет 👆",
+        "Пауза останавливает рост, вредителей и стихии. Можно спокойно отойти.",
+        "Сохранение работает в этом браузере. На другом устройстве — не перенесётся."
+    ];
+    let tipIndex = 0;
+
+    function nextTip() {
+        tipIndex = (tipIndex + 1) % tips.length;
+        document.getElementById('tip-text').innerText = tips[tipIndex];
+    }
+
+    let farmAreas = [];
+
+    function generateArea(type, startClear = false) {
+        let area = {
+            type: type, nextPlotPrice: 8, obstaclePrice: 25, plots: [],
+            dripLevel: 0, teamLevel: 0, workerLevel: 0, insuranceTime: 0,
+            watering: { type: null, timeLeft: 0, mult: 1.0 },
+            booster: { type: null, timeLeft: 0, growthMult: 1, pests: 1 }, 
+            worker: { active: false, time: 0 },
+            hunter: { active: false, time: 0 },
+            pioneers: { active: false, time: 0 }
+        };
+        let indices = [];
+        for(let i=0; i<20; i++) {
+            indices.push(i);
+            area.plots.push({ state: 'locked', obstacleType: null, status: 'empty', cropId: null, timeLeft: 0, isGolden: false, pest: null });
+        }
+        indices.sort(() => Math.random() - 0.5);
+        if(startClear) {
+            for(let i=0; i<4; i++) area.plots[indices[i]].state = 'clear';
+            for(let i=4; i<8; i++) { area.plots[indices[i]].state = 'obstacle'; area.plots[indices[i]].obstacleType = Math.random() > 0.5 ? '🪵' : '🪨'; }
+        } else {
+            for(let i=0; i<5; i++) { area.plots[indices[i]].state = 'obstacle'; area.plots[indices[i]].obstacleType = Math.random() > 0.5 ? '🪵' : '🪨'; }
+        }
+        return area;
+    }
+
+    function formatDisplayNumber(n) {
+        return n.toLocaleString('ru-RU');
+    }
+
+    function saveGame() {
+        if(isPaused || isDisasterActive) return alert("Снимите игру с паузы перед сохранением!");
+        const saveObj = { state: gameState, areas: farmAreas };
+        localStorage.setItem('antonFarmSave2', JSON.stringify(saveObj));
+        alert("Ура! Игра успешно сохранена 💾");
+    }
+
+    function loadGame() {
+        const savedData = localStorage.getItem('antonFarmSave2');
+        if (savedData) {
+            const parsed = JSON.parse(savedData);
+            gameState = parsed.state;
+            if (!gameState.nextDisasterTime) gameState.nextDisasterTime = getNextDisasterTime();
+
+            farmAreas = parsed.areas.map(a => {
+                if(!a.booster) a.booster = { type: null, timeLeft: 0, growthMult: 1, pests: 1 };
+                if(a.insuranceTime === undefined) a.insuranceTime = 0;
+                if(!a.worker) a.worker = { active: false, time: 0 };
+                return a;
+            });
+            
+            isPaused = false; isDisasterActive = false;
+            document.getElementById('pause-screen').style.display = 'none';
+            document.getElementById('disaster-modal').style.display = 'none';
+            document.getElementById('btn-pause').classList.remove('active-pause');
+            document.getElementById('btn-pause').innerText = "⏸ Пауза";
+
+            updateUI(); renderShop(); renderGrid();
+            alert("Сохранение загружено! С возвращением на ферму 🚜");
+        } else { alert("Сохранений пока нет! Сначала нужно сохранить игру."); }
+    }
+
+    function togglePause() {
+        if (isDisasterActive) return; 
+        isPaused = !isPaused;
+        const pauseScreen = document.getElementById('pause-screen');
+        const pauseBtn = document.getElementById('btn-pause');
+        if (isPaused) { pauseScreen.style.display = 'flex'; pauseBtn.classList.add('active-pause'); pauseBtn.innerText = "▶ ПРОДОЛЖИТЬ"; } 
+        else { pauseScreen.style.display = 'none'; pauseBtn.classList.remove('active-pause'); pauseBtn.innerText = "⏸ Пауза"; }
+    }
+
+    function initGame() {
+        farmAreas.push(generateArea('veggies', true));
+        renderShop(); renderGrid(); updateUI();
+        setInterval(gameTick, 1000);
+        setInterval(spawnPest, 12000); // чуть реже вредители
+        // Показать подсказку про установку на Android через 4 секунды
+        setTimeout(() => {
+            const hint = document.getElementById('install-hint');
+            if (hint && !window.matchMedia('(display-mode: standalone)').matches) {
+                hint.style.display = 'block';
+                setTimeout(() => hint.style.display = 'none', 12000);
+            }
+        }, 4000);
+        // Цикл подсказок каждые 45 сек
+        setInterval(nextTip, 45000);
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.market-section').forEach(s => s.classList.remove('active'));
+        const tabMap = {'seeds':0, 'trees':1, 'services':2, 'upgrades':3};
+        document.querySelectorAll('.tab-btn')[tabMap[tab]].classList.add('active');
+        document.getElementById(`sec-${tab}`).classList.add('active');
+    }
+
+    function formatTime(s) { let m=Math.floor(s/60), sc=Math.floor(s%60); return `${m}:${sc<10?'0':''}${sc}`; }
+
+    function updateUI() {
+        document.getElementById('money-display').innerText = formatDisplayNumber(gameState.money);
+        
+        let area = farmAreas[gameState.currentArea];
+        let areaMult = Math.pow(6, gameState.currentArea); // мягче инфляции (было ×10)
+        
+        document.getElementById('area-title').innerText = `Участок ${gameState.currentArea + 1} (${area.type === 'veggies' ? 'Овощи' : 'Сад'})`;
+        document.getElementById('prev-area').disabled = gameState.currentArea === 0;
+        document.getElementById('next-area').disabled = gameState.currentArea === farmAreas.length - 1;
+
+        let allClear = area.plots.every(p => p.state === 'clear');
+        let isLastArea = gameState.currentArea === farmAreas.length - 1;
+        // Мягче цена нового участка
+        let newAreaPrice = 12000 * Math.pow(6, farmAreas.length - 1);
+        let buyBtn = document.getElementById('buy-area-btn');
+        
+        if (allClear && isLastArea) {
+            buyBtn.style.display = 'block'; buyBtn.innerText = `Купить новый участок за ${formatDisplayNumber(newAreaPrice)} 🪙`;
+            buyBtn.onclick = () => {
+                if(gameState.money >= newAreaPrice) {
+                    gameState.money -= newAreaPrice; farmAreas.push(generateArea('trees', false)); gameState.currentArea++; updateUI(); renderGrid();
+                } else alert("Не хватает денег!");
+            };
+        } else { buyBtn.style.display = 'none'; }
+
+        document.getElementById('btn-ins').innerText = formatDisplayNumber(basePrices.insurance * areaMult) + ' 🪙';
+        document.getElementById('btn-srv-worker').innerText = formatDisplayNumber(basePrices.worker * areaMult) + ' 🪙';
+        document.getElementById('btn-srv-hunter').innerText = formatDisplayNumber(basePrices.hunter * areaMult) + ' 🪙';
+        document.getElementById('btn-srv-pioneers').innerText = formatDisplayNumber(basePrices.pioneers * areaMult) + ' 🪙';
+        document.getElementById('btn-wat-can').innerText = formatDisplayNumber(basePrices.can * areaMult) + ' 🪙';
+        document.getElementById('btn-wat-hose').innerText = formatDisplayNumber(basePrices.hose * areaMult) + ' 🪙';
+        document.getElementById('btn-wat-drip').innerText = formatDisplayNumber(basePrices.drip * areaMult) + ' 🪙';
+        document.getElementById('btn-bst-manure').innerText = formatDisplayNumber(basePrices.manure * areaMult) + ' 🪙';
+        document.getElementById('btn-bst-super').innerText = formatDisplayNumber(basePrices.super_manure * areaMult) + ' 🪙';
+
+        let hp = document.getElementById('helpers-panel');
+        hp.innerHTML = '';
+        
+        if(area.insuranceTime > 0) hp.innerHTML += `<div class="helper-badge insurance" title="Страховка активна">🛡️ Страховка (${formatTime(area.insuranceTime)})</div>`;
+        if(area.watering.timeLeft > 0) {
+            let wLabels = { 'can': '🚿 Лейка', 'hose': '💦 Шланг', 'drip': '💧 Капельница' };
+            hp.innerHTML += `<div class="helper-badge water" title="Полив ускоряет рост">${wLabels[area.watering.type]} (${formatTime(area.watering.timeLeft)})</div>`;
+        }
+        if(area.booster.timeLeft > 0) {
+            let bLabels = { 'manure': '💩 Навоз', 'super_manure': '☢️ Супер Навоз' };
+            hp.innerHTML += `<div class="helper-badge booster" title="Удобрение ускоряет рост, но больше вредителей">${bLabels[area.booster.type]} (${formatTime(area.booster.timeLeft)})</div>`;
+        }
+        if(area.worker.active) hp.innerHTML += `<div class="helper-badge" title="Рабочий сажает выбранные семена и собирает">👷 Рабочий (${formatTime(area.worker.time)})<button class="fire-btn" onclick="fire('worker')">✖</button></div>`;
+        if(area.hunter.active) hp.innerHTML += `<div class="helper-badge" title="Охотник защищает от кротов и зайцев">🤠 Охотник (${formatTime(area.hunter.time)})<button class="fire-btn" onclick="fire('hunter')">✖</button></div>`;
+        if(area.pioneers.active) hp.innerHTML += `<div class="helper-badge pioneers" title="Пионеры собирают улиток">👦 Пионеры (${formatTime(area.pioneers.time)})</div>`; 
+
+        const setupUpgradeBtn = (id, currentLvl, targetLvl, baseKey) => {
+            let btn = document.getElementById(id);
+            if(!btn) return;
+            if(currentLvl >= targetLvl) { 
+                btn.innerText = "Куплено"; btn.disabled = true; btn.style.opacity = '0.5'; 
+            } else { 
+                btn.innerText = formatDisplayNumber(basePrices[baseKey] * areaMult) + ' 🪙'; 
+                btn.disabled = false; btn.style.opacity = '1'; 
+            }
+        };
+
+        setupUpgradeBtn('upg-drip-1', area.dripLevel, 1, 'drip-1'); setupUpgradeBtn('upg-drip-2', area.dripLevel, 2, 'drip-2'); setupUpgradeBtn('upg-drip-3', area.dripLevel, 3, 'drip-3');
+        setupUpgradeBtn('upg-team-1', area.teamLevel, 1, 'team-1'); setupUpgradeBtn('upg-team-2', area.teamLevel, 2, 'team-2'); setupUpgradeBtn('upg-team-3', area.teamLevel, 3, 'team-3');
+        setupUpgradeBtn('upg-worker-1', area.workerLevel, 1, 'worker-1'); setupUpgradeBtn('upg-worker-2', area.workerLevel, 2, 'worker-2');
+    }
+
+    function changeArea(dir) { gameState.currentArea += dir; updateUI(); renderGrid(); }
+
+    function renderShop() {
+        const drawItems = (typeFilter, containerId) => {
+            const container = document.getElementById(containerId); container.innerHTML = '';
+            crops.filter(c => c.type === typeFilter).forEach(crop => {
+                const div = document.createElement('div');
+                div.className = `shop-item ${gameState.selectedSeed === crop.id ? 'selected' : ''}`;
+                div.title = `${crop.name}: семена ${formatDisplayNumber(crop.seedPrice)} 🪙 → продажа ${formatDisplayNumber(crop.sellPrice)} 🪙 | рост ${crop.time}с | прибыль ~${formatDisplayNumber(crop.sellPrice - crop.seedPrice)}`;
+                div.onclick = () => { gameState.selectedSeed = crop.id; renderShop(); renderGrid(); };
+                div.innerHTML = `<div class="item-info"><span style="font-size:24px">${crop.emoji}</span><div><strong>${crop.name}</strong><br><small>Рост: ${crop.time}с | Доход: ${formatDisplayNumber(crop.sellPrice)}</small></div></div><div>${formatDisplayNumber(crop.seedPrice)}🪙</div>`;
+                container.appendChild(div);
+            });
+        };
+        drawItems('veggies', 'sec-seeds'); drawItems('trees', 'sec-trees');
+    }
+
+    function renderGrid() {
+        const grid = document.getElementById('farm-grid'); grid.innerHTML = '';
+        let area = farmAreas[gameState.currentArea];
+        
+        area.plots.forEach((plot, index) => {
+            const div = document.createElement('div');
+            div.className = 'plot'; div.onclick = () => handlePlotClick(index);
+
+            if (plot.state === 'locked') {
+                div.classList.add('locked');
+                div.title = `Купить грядку за ${formatDisplayNumber(area.nextPlotPrice)} 🪙`;
+                div.innerHTML = `<span class="emoji">🔒</span><div class="price-tag">${formatDisplayNumber(area.nextPlotPrice)}🪙</div>`;
+            } else if (plot.state === 'obstacle') {
+                div.classList.add('obstacle');
+                div.title = `Корчевать за ${formatDisplayNumber(area.obstaclePrice)} 🪙`;
+                div.innerHTML = `<span class="emoji">${plot.obstacleType}</span><div class="price-tag">${formatDisplayNumber(area.obstaclePrice)}🪙</div>`;
+            } else if (plot.state === 'clear') {
+                if (plot.status === 'empty') { 
+                    let activeCrop = crops.find(c => c.id === gameState.selectedSeed);
+                    let ghostHtml = '';
+                    if (activeCrop && activeCrop.type === area.type) {
+                        ghostHtml = `<span class="emoji ghost-seed">${activeCrop.emoji}</span>`;
+                        div.title = `Посадить ${activeCrop.name} (${activeCrop.seedPrice} 🪙)`;
+                    } else {
+                        div.title = 'Выбери подходящие семена в магазине';
+                    }
+                    div.innerHTML = `<span class="emoji">🟫</span>${ghostHtml}`;
+                } else if (plot.status === 'growing') {
+                    const crop = crops.find(c => c.id === plot.cropId);
+                    div.title = `${crop.name} растёт… осталось ~${Math.ceil(plot.timeLeft)}с`;
+                    div.innerHTML = `<div class="crop-label">${crop.name}</div><span class="emoji">🌱</span><div class="timer">${Math.ceil(plot.timeLeft)}с</div>`;
+                } else if (plot.status === 'ready') {
+                    const crop = crops.find(c => c.id === plot.cropId);
+                    let e = plot.isGolden ? crop.emoji + "✨" : crop.emoji;
+                    let reward = plot.isGolden ? crop.sellPrice * 3 : crop.sellPrice;
+                    div.title = `Собрать ${crop.name} → +${formatDisplayNumber(reward)} 🪙`;
+                    div.innerHTML = `<div class="crop-label">${crop.name}</div><span class="emoji">${e}</span><div class="timer" style="background:#4caf50">Сбор!</div>`;
+                }
+
+                if (plot.pest) {
+                    let pInfo = { 'mole':'🦫', 'hare':'🐇', 'snail':'🐌' };
+                    let pNames = { 'mole':'Крот', 'hare':'Заяц', 'snail':'Улитка' };
+                    let hpBadge = plot.pest.type === 'snail' ? `<div class="pest-hp">${plot.pest.hp}</div>` : '';
+                    div.title = `${pNames[plot.pest.type]}! Кликни, чтобы прогнать`;
+                    div.innerHTML += `<div class="pest"><span>${pInfo[plot.pest.type]}</span>${hpBadge}</div>`;
+                }
+            }
+            grid.appendChild(div);
+        });
+    }
+
+    function handlePlotClick(index) {
+        if (isPaused || isDisasterActive) return; 
+        let area = farmAreas[gameState.currentArea]; let plot = area.plots[index];
+
+        if (plot.state === 'clear' && plot.pest) {
+            if (plot.pest.type === 'snail') { plot.pest.hp--; if(plot.pest.hp <= 0) { plot.pest = null; gameState.money += 10; } } 
+            else { plot.pest = null; gameState.money += 5; }
+            updateUI(); renderGrid(); return;
+        }
+
+        if (plot.state === 'obstacle') {
+            if (gameState.money >= area.obstaclePrice) {
+                gameState.money -= area.obstaclePrice; plot.state = 'clear'; plot.status = 'empty'; 
+                area.obstaclePrice += Math.floor(area.obstaclePrice * 0.35); // мягче рост цены
+                updateUI(); renderGrid();
+            } else alert("Не хватает денег на корчёвку!"); return;
+        }
+
+        if (plot.state === 'locked') {
+            if (gameState.money >= area.nextPlotPrice) {
+                gameState.money -= area.nextPlotPrice; plot.state = 'clear'; plot.status = 'empty'; 
+                area.nextPlotPrice += Math.floor(area.nextPlotPrice * 0.22); // мягче
+                updateUI(); renderGrid();
+            } else alert("Не хватает денег!"); return;
+        }
+
+        if (plot.state === 'clear') {
+            if (plot.status === 'empty') {
+                let activeCrop = crops.find(c => c.id === gameState.selectedSeed);
+                if (area.type !== activeCrop.type) return alert(`Сажайте только на участке: ${activeCrop.type === 'veggies'?'Овощи':'Сад'}!`);
+                
+                if (gameState.money >= activeCrop.seedPrice) {
+                    gameState.money -= activeCrop.seedPrice; plot.status = 'growing'; plot.cropId = activeCrop.id; plot.timeLeft = activeCrop.time; plot.isGolden = Math.random() < 0.15;
+                    updateUI(); renderGrid();
+                } else alert("Нет денег на семена!");
+            } else if (plot.status === 'ready') {
+                let cropPlanted = crops.find(c => c.id === plot.cropId);
+                gameState.money += plot.isGolden ? cropPlanted.sellPrice * 3 : cropPlanted.sellPrice;
+                plot.status = 'empty'; plot.cropId = null; plot.isGolden = false; updateUI(); renderGrid();
+            }
+        }
+    }
+
+    function buyService(type) {
+        if (isPaused || isDisasterActive) return; 
+        let area = farmAreas[gameState.currentArea];
+        let areaMult = Math.pow(6, gameState.currentArea);
+        let teamDurationMult = [1, 2, 3, 5][area.teamLevel];
+
+        if (type === 'insurance') {
+            let price = basePrices.insurance * areaMult;
+            if(gameState.money >= price) { gameState.money -= price; area.insuranceTime += 90; } else return alert("Мало монет!");
+        } 
+        else if (type === 'worker') {
+            let price = basePrices.worker * areaMult;
+            if(gameState.money >= price) { 
+                gameState.money -= price; 
+                area.worker = { active: true, time: 900 }; // без фиксированного cropId
+                alert(`Рабочий нанят! Он будет сажать то, что ты выберешь в магазине.`); 
+            } else return alert("Мало монет!");
+        }
+        else if (type === 'hunter') {
+            let price = basePrices.hunter * areaMult;
+            if(gameState.money >= price) { gameState.money -= price; area.hunter = { active: true, time: 600 * teamDurationMult }; } else return alert("Мало монет!");
+        }
+        else if (type === 'pioneers') {
+            let price = basePrices.pioneers * areaMult;
+            if(gameState.money >= price) { gameState.money -= price; area.pioneers = { active: true, time: 600 * teamDurationMult }; } else return alert("Мало монет!");
+        }
+        else if (type === 'can' || type === 'hose' || type === 'drip') {
+            let price = basePrices[type] * areaMult;
+            if(gameState.money >= price) {
+                gameState.money -= price;
+                let duration = type === 'can' ? 300 : (type === 'hose' ? 600 : 1200);
+                let baseMult = type === 'can' ? 1.05 : (type === 'hose' ? 1.10 : 1.20);
+                if(type === 'drip') { baseMult = area.dripLevel === 1 ? 1.30 : (area.dripLevel === 2 ? 1.40 : (area.dripLevel === 3 ? 1.50 : 1.20)); }
+                area.watering = { type: type, timeLeft: duration, mult: baseMult };
+            } else return alert("Мало монет!");
+        }
+        else if (type === 'manure' || type === 'super_manure') {
+            let price = basePrices[type] * areaMult;
+            if(gameState.money >= price) {
+                gameState.money -= price;
+                let duration = type === 'manure' ? 180 : 300;
+                let gMult = type === 'manure' ? 3 : 6;
+                let pMult = type === 'manure' ? 2 : 4;
+                area.booster = { type: type, timeLeft: duration, growthMult: gMult, pests: pMult };
+            } else return alert("Мало монет!");
+        }
+        updateUI();
+    }
+
+    function buyUpgrade(category, level) {
+        if (isPaused || isDisasterActive) return; 
+        let area = farmAreas[gameState.currentArea];
+        let areaMult = Math.pow(6, gameState.currentArea);
+        let baseKey = `${category}-${level}`;
+        let price = basePrices[baseKey] * areaMult;
+
+        if(area[category+'Level'] >= level) return;
+        if(area[category+'Level'] < level - 1) return alert("Сначала купите предыдущий уровень!");
+        if(gameState.money >= price) { gameState.money -= price; area[category+'Level'] = level; updateUI(); } else alert("Мало монет!");
+    }
+
+    function fire(type) {
+        if (isPaused || isDisasterActive) return; let area = farmAreas[gameState.currentArea];
+        if(confirm("Точно уволить сотрудника? Деньги не вернутся!")) { area[type].active = false; area[type].time = 0; updateUI(); }
+    }
+
+    function getNextDisasterTime() { return 480 + Math.floor(Math.random() * 420); } // реже стихии
+
+    function triggerDisaster() {
+        let area = farmAreas[gameState.currentArea]; 
+        let types = ['lightning', 'flood', 'drought'];
+        let disaster = types[Math.floor(Math.random() * types.length)];
+        let title = ""; let text = "";
+        let totalLoss = 0; 
+
+        if (disaster === 'lightning' || disaster === 'flood') {
+            title = disaster === 'lightning' ? "⚡ УДАР МОЛНИИ!" : "🌊 НАВОДНЕНИЕ!";
+            text = disaster === 'lightning' ? "Гроза сожгла одну грядку! Теперь там обгорелый пень." : "Река затопила одну грядку. Теперь там болото.";
+            
+            let validPlots = [];
+            area.plots.forEach((p, idx) => { if (p.state === 'clear') validPlots.push(idx); });
+            
+            if (validPlots.length > 0) {
+                let p = area.plots[validPlots[Math.floor(Math.random() * validPlots.length)]];
+                if (p.status === 'growing' || p.status === 'ready') {
+                    let c = crops.find(cr => cr.id === p.cropId);
+                    if (c) totalLoss += c.sellPrice;
+                }
+                totalLoss += area.obstaclePrice; 
+                p.state = 'obstacle'; p.obstacleType = disaster === 'lightning' ? '🪵' : '💦';
+                p.status = 'empty'; p.cropId = null; p.pest = null;
+            }
+        } else if (disaster === 'drought') {
+            title = "☀️ ЖЕСТОКАЯ ЗАСУХА!";
+            text = "Солнце спалило один растущий урожай! Активный полив отменён.";
+            area.watering.timeLeft = 0; area.watering.mult = 1.0;
+            
+            let validPlots = [];
+            area.plots.forEach((p, idx) => { if (p.state === 'clear' && p.status === 'growing') validPlots.push(idx); });
+            
+            if (validPlots.length > 0) {
+                let p = area.plots[validPlots[Math.floor(Math.random() * validPlots.length)]];
+                let c = crops.find(cr => cr.id === p.cropId);
+                if (c) totalLoss += c.sellPrice;
+                p.status = 'empty'; p.cropId = null; p.isGolden = false;
+            }
+        }
+
+        if (area.insuranceTime > 0 && totalLoss > 0) {
+            let payout = totalLoss * 3;
+            gameState.money += payout;
+            text += `<br><br><span style="color:#2e7d32; font-size: 16px;"><b>🛡️ Страховка сработала!</b></span><br>Вы получили тройную компенсацию: <b>+${formatDisplayNumber(payout)} 🪙</b>`;
+        } else if (area.insuranceTime <= 0 && totalLoss > 0) {
+            text += `<br><br><span style="color:#d32f2f;">У вас не было страховки! Убытки не возмещены.</span>`;
+        }
+
+        isDisasterActive = true;
+        document.getElementById('modal-title').innerHTML = title;
+        document.getElementById('modal-text').innerHTML = text;
+        document.getElementById('disaster-modal').style.display = 'flex';
+        renderGrid();
+    }
+
+    function closeDisasterModal() {
+        document.getElementById('disaster-modal').style.display = 'none';
+        isDisasterActive = false;
+    }
+
+    function gameTick() {
+        if (isPaused || isDisasterActive) return;
+
+        gameState.nextDisasterTime--;
+        if (gameState.nextDisasterTime <= 0) {
+            triggerDisaster(); gameState.nextDisasterTime = getNextDisasterTime(); return; 
+        }
+
+        let triggerRedFlash = false; 
+
+        farmAreas.forEach((area) => {
+            if(area.insuranceTime > 0) area.insuranceTime--;
+            if(area.watering.timeLeft > 0) area.watering.timeLeft--; else area.watering.mult = 1.0;
+            if(area.booster.timeLeft > 0) area.booster.timeLeft--; else { area.booster.growthMult = 1; area.booster.pests = 1; }
+
+            if(area.worker.active && --area.worker.time <= 0) area.worker.active = false;
+            if(area.hunter.active && --area.hunter.time <= 0) area.hunter.active = false;
+            if(area.pioneers.active && --area.pioneers.time <= 0) area.pioneers.active = false;
+
+            let totalGrowthMult = area.watering.mult * area.booster.growthMult;
+
+            area.plots.forEach((plot, pIdx) => {
+                if(area.hunter.active && plot.pest && (plot.pest.type === 'mole' || plot.pest.type === 'hare')) { plot.pest = null; gameState.money += 5; }
+                if(area.pioneers.active && plot.pest && plot.pest.type === 'snail') { plot.pest.hp--; if(plot.pest.hp <= 0) { plot.pest = null; gameState.money += 10; } }
+
+                if (plot.state === 'clear' && plot.status === 'growing' && !plot.pest) {
+                    plot.timeLeft -= totalGrowthMult;
+                    if (plot.timeLeft <= 0) plot.status = 'ready';
+                }
+
+                // Рабочий использует ТЕКУЩИЙ выбранный семя
+                if(area.worker.active && plot.state === 'clear' && !plot.pest) {
+                    let targetCrop = crops.find(c => c.id === gameState.selectedSeed);
+                    if (targetCrop && area.type === targetCrop.type) {
+                        if(plot.status === 'ready') {
+                            let c = crops.find(cr => cr.id === plot.cropId); 
+                            let baseReward = plot.isGolden ? c.sellPrice * 3 : c.sellPrice;
+                            let workerHarvestMult = [1, 2, 3][area.workerLevel];
+                            gameState.money += (baseReward * workerHarvestMult);
+                            plot.status = 'empty'; plot.cropId = null; plot.isGolden = false;
+                        }
+                        if(plot.status === 'empty' && gameState.money >= targetCrop.seedPrice) {
+                            gameState.money -= targetCrop.seedPrice;
+                            plot.status = 'growing'; plot.cropId = targetCrop.id; plot.timeLeft = targetCrop.time; plot.isGolden = Math.random() < 0.15;
+                        }
+                    }
+                }
+
+                if (plot.pest) {
+                    plot.pest.time--;
+                    if(plot.pest.time <= 0) { 
+                        if (plot.pest.type === 'mole' || plot.pest.type === 'hare') triggerRedFlash = true; 
+                        plot.pest = null; plot.status = 'empty'; plot.cropId = null; plot.isGolden = false; 
+                    }
+                }
+            });
+        });
+
+        if (triggerRedFlash) {
+            const grid = document.getElementById('farm-grid');
+            grid.classList.add('flash-red');
+            setTimeout(() => grid.classList.remove('flash-red'), 2000); 
+        }
+
+        updateUI(); renderGrid();
+    }
+
+    function spawnPest() {
+        if (isPaused || isDisasterActive) return;
+
+        farmAreas.forEach((area) => {
+            let validPlots = [];
+            area.plots.forEach((plot, pIdx) => {
+                if (plot.state === 'clear' && (plot.status === 'growing' || plot.status === 'ready') && !plot.pest) {
+                    validPlots.push(pIdx);
+                }
+            });
+
+            if (validPlots.length > 0) {
+                // Меньше шанс спавна без бустера
+                let spawnCount = area.booster.timeLeft > 0 ? area.booster.pests : (Math.random() < 0.22 ? 1 : 0);
+
+                for(let i=0; i<spawnCount; i++) {
+                    if(validPlots.length === 0) break;
+                    let rIndex = Math.floor(Math.random() * validPlots.length);
+                    let pIdx = validPlots[rIndex];
+                    validPlots.splice(rIndex, 1);
+
+                    let pestType = 'snail'; let rand = Math.random();
+                    if(area.type === 'veggies' && rand > 0.45) pestType = 'mole';
+                    else if(area.type === 'trees' && rand > 0.45) pestType = 'hare';
+
+                    let pestData = { type: pestType, time: 10, hp: 1 }; // чуть больше времени на реакцию
+                    if(pestType === 'snail') { pestData.time = 18; pestData.hp = Math.floor(Math.random()*3)+4; } 
+
+                    area.plots[pIdx].pest = pestData;
+                }
+            }
+        });
+        renderGrid();
+    }
+
+    window.onload = initGame;
+</script>
+</body>
+</html>
