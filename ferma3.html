@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#4f9a2a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ферма Антоши">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="ferma3.webmanifest">
+<link rel="icon" type="image/png" href="ferma3-icon-192.png">
+<link rel="apple-touch-icon" href="ferma3-icon-192.png">
+<title>Ферма Антоши 3</title>
+<style>
+/* ============ ОСНОВА ============ */
+:root{
+  --wood:#8a5a2b; --wood-d:#5e3a17; --cream:#fff6dc; --cream-d:#f1e2b4;
+  --green:#63b233; --green-d:#3f8a1c; --gold:#ffc93c; --red:#e5484d; --blue:#3fa9f5; --ink:#4a2f14;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{
+  font-family:ui-rounded,"SF Pro Rounded","Nunito","Segoe UI",Roboto,Arial,sans-serif;
+  color:var(--ink); background:#7cc04b url('ferma3-bg.webp') center/cover no-repeat; touch-action:manipulation;
+}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+#app{
+  position:relative; height:100vh; height:100dvh; max-width:500px; margin:0 auto;
+  display:flex; flex-direction:column; gap:6px;
+  padding:calc(6px + env(safe-area-inset-top)) 8px calc(6px + env(safe-area-inset-bottom));
+}
+.card{background:var(--cream);border:2px solid var(--wood);border-radius:14px;box-shadow:0 3px 0 var(--wood-d)}
+
+/* ============ ВЕРХНЯЯ ПАНЕЛЬ ============ */
+.hud{display:flex;gap:6px;align-items:stretch;flex:none}
+.lvl{flex:1;min-width:0;display:flex;align-items:center;gap:6px;padding:3px 8px 3px 4px}
+.star{position:relative;width:34px;height:34px;flex:none;display:grid;place-items:center;font-size:30px;line-height:1}
+.star b{position:absolute;left:0;right:0;top:11px;text-align:center;font-size:13px;font-weight:900;color:#6b3f00}
+.xp{flex:1;height:16px;background:#e6d6a8;border-radius:8px;position:relative;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.2)}
+.xp i{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(#a8ec6a,#5cb82f);border-radius:8px;transition:width .35s}
+.xp span{position:absolute;inset:0;font-size:10px;font-weight:800;text-align:center;line-height:16px;color:#3b2a0a}
+.pill{padding:0 9px;min-height:42px;display:flex;align-items:center;gap:4px;font-weight:900;font-size:16px;white-space:nowrap}
+.pill.water{color:#1769aa}
+.ibtn{width:42px;font-size:20px;display:grid;place-items:center}
+.ibtn:active,.nav button:active,.areas button:active{transform:translateY(2px);box-shadow:0 1px 0 var(--wood-d)}
+.bump{animation:bump .25s}
+@keyframes bump{50%{transform:scale(1.12)}}
+
+/* ============ ПОГОДА / РЫНОК / ЗАКАЗЫ ============ */
+.info{display:flex;gap:6px;flex:none}
+.chip{background:rgba(255,246,220,.94);border:2px solid var(--wood);border-radius:12px;padding:3px 8px;font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:26px;display:flex;align-items:center;gap:4px}
+.chip.wx{flex:1}
+.chip.hot{background:#ffe9c7;border-color:#e2711d;color:#a23b00}
+.chip.mus{flex:none;width:38px;justify-content:center;padding:0;font-size:15px;color:#9c8560}
+.chip.mus.on{background:#d9f7c1;border-color:var(--green-d);animation:pulse 1.6s infinite}
+.chip.wx.storm{background:#d7dcec;border-color:#4b5578}
+.chip.wx.rain{background:#dbeeff;border-color:#3d7fb8}
+.chip.wx.heat{background:#ffe1b8;border-color:#d9630b}
+.chip.wx.rainbow{background:linear-gradient(90deg,#ffd6d6,#fff3c4,#d7f7d0,#d3ecff,#ecd9ff)}
+.orders{display:flex;gap:6px;flex:none}
+.ord{flex:1;min-width:0;height:42px;border-radius:12px;border:2px solid var(--wood);background:rgba(255,246,220,.94);padding:2px 6px;display:flex;align-items:center;gap:5px;text-align:left;box-shadow:0 2px 0 var(--wood-d)}
+.ord .who{font-size:22px;flex:none}
+.ord .tx{min-width:0;flex:1;display:flex;flex-direction:column;line-height:1.15}
+.ord .need{font-size:11.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ord .rw{font-size:10.5px;font-weight:800;color:#9a6a00;white-space:nowrap}
+.ord.wait{justify-content:center;font-size:12px;font-weight:800;color:#9c8560;background:rgba(255,246,220,.7);box-shadow:none;border-style:dashed}
+.ord.done{background:#d9f7c1;border-color:var(--green-d);animation:pulse 1s infinite}
+.ord.done .rw{color:#1f6b00}
+@keyframes pulse{50%{transform:scale(1.04)}}
+
+/* ============ ВКЛАДКИ УЧАСТКОВ ============ */
+.areas{display:flex;gap:5px;flex:none}
+.areas button{flex:1;min-width:0;height:34px;border-radius:12px 12px 6px 6px;border:2px solid var(--wood);background:#e9d9a8;font-size:12px;font-weight:800;position:relative;box-shadow:0 2px 0 var(--wood-d);white-space:nowrap;overflow:visible}
+.areas button.on{background:var(--green);color:#fff;border-color:var(--green-d);box-shadow:0 2px 0 #2c6410;text-shadow:0 1px 0 rgba(0,0,0,.3)}
+.areas button.lock{background:#cfc6ad;color:#7b6f58}
+.areas button.buyable{background:#ffe08a;animation:pulse 1.2s infinite}
+.areas .dot{position:absolute;top:-7px;right:-3px;min-width:17px;height:17px;border-radius:9px;background:var(--green-d);color:#fff;font-size:10px;line-height:17px;padding:0 4px;border:1.5px solid #fff;text-shadow:none}
+.areas .dot.pest{background:var(--red);right:auto;left:-3px;animation:pulse .6s infinite}
+
+/* ============ ПОЛЕ ============ */
+.field-wrap{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center}
+.field-box{position:relative;width:100%;height:100%;max-height:min(84vw,420px)}
+.field{
+  position:absolute;inset:0;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(4,1fr);gap:5px;padding:7px;
+  background:linear-gradient(#a8743c,#8a5a2b);border:3px solid var(--wood-d);border-radius:18px;
+  box-shadow:0 5px 0 rgba(0,0,0,.25), inset 0 2px 0 rgba(255,255,255,.25); touch-action:none;
+}
+.field.indoor{background:linear-gradient(#bfe6f2,#8fc7d8);border-color:#4f8ea3}
+.field.shake{animation:shake .4s}
+@keyframes shake{20%{transform:translate(-5px,2px)}40%{transform:translate(5px,-2px)}60%{transform:translate(-3px,1px)}80%{transform:translate(3px,0)}}
+.plot{position:relative;border-radius:11px;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;overflow:visible;cursor:pointer}
+.plot.soil{
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,.10) 0 2px,transparent 2px 9px),radial-gradient(circle at 50% 35%,#8b5a34,#6b4226);
+  box-shadow:inset 0 -4px 0 rgba(0,0,0,.28),inset 0 2px 0 rgba(255,255,255,.14);
+}
+.plot.soil.wet{background:repeating-linear-gradient(180deg,rgba(0,0,0,.14) 0 2px,transparent 2px 9px),radial-gradient(circle at 50% 35%,#5e4634,#3f2c1f)}
+.plot.wild{background:linear-gradient(#86cf52,#5aa832);box-shadow:inset 0 -4px 0 rgba(0,0,0,.18),inset 0 2px 0 rgba(255,255,255,.3);opacity:.92}
+.plot.wild .em{filter:saturate(.8);opacity:.85;font-size:min(6.4vw,30px)}
+.plot.wild.can{box-shadow:inset 0 -4px 0 rgba(0,0,0,.18),0 0 0 2px var(--gold)}
+.plot.wild.can .em{opacity:1}
+.plot.ready{box-shadow:inset 0 -4px 0 rgba(0,0,0,.28),0 0 0 2.5px #b6f36a,0 0 10px 2px rgba(182,243,106,.8)}
+.plot.gold{box-shadow:inset 0 -4px 0 rgba(0,0,0,.28),0 0 0 2.5px var(--gold),0 0 14px 4px rgba(255,201,60,.95)}
+.plot.rm{outline:2px dashed var(--red);outline-offset:-3px}
+.em{font-size:min(8vw,38px);line-height:1;pointer-events:none;transform-origin:50% 90%;display:block}
+.em.ghost{opacity:.28;transform:scale(.8)}
+.em.s0{transform:scale(.5);animation:sprout .35s}
+.em.s1{transform:scale(.72);animation:sprout .35s}
+.em.s2{transform:scale(.8);filter:saturate(.55) brightness(.92);animation:sprout .35s}
+.em.ripe{animation:ripe 1s ease-in-out infinite}
+.em.tree{animation:sway 3.2s ease-in-out infinite}
+.em.animal{animation:idle 1.6s ease-in-out infinite}
+@keyframes sprout{0%{transform:scale(.2)}70%{transform:scale(.95)}}
+@keyframes ripe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-10%) scale(1.08)}}
+@keyframes sway{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
+@keyframes idle{0%,100%{transform:translateY(0)}50%{transform:translateY(-6%) rotate(-3deg)}}
+.badge{position:absolute;right:-2px;bottom:6px;font-size:min(5.2vw,24px);line-height:1;pointer-events:none;animation:ripe .9s ease-in-out infinite;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));z-index:2;white-space:nowrap}
+.badge small{font-size:10px;font-weight:900;color:#fff;background:var(--green-d);border-radius:8px;padding:0 4px;margin-left:-6px;vertical-align:top}
+.spark{position:absolute;top:0;left:2px;font-size:13px;pointer-events:none;animation:twinkle .8s infinite alternate;z-index:3}
+@keyframes twinkle{from{opacity:.3;transform:scale(.7) rotate(-20deg)}to{opacity:1;transform:scale(1.15) rotate(15deg)}}
+.tag{position:absolute;left:50%;transform:translateX(-50%);bottom:6px;font-size:9.5px;font-weight:900;color:#fff;background:rgba(0,0,0,.55);padding:0 4px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:2;line-height:13px}
+.tag.price{bottom:3px;background:rgba(40,70,10,.75);color:#fff7c2}
+.plot.wild:not(.can) .tag.price{color:#d9e6c3;background:rgba(40,70,10,.5)}
+.bar{position:absolute;left:5px;right:5px;bottom:2px;height:4px;border-radius:3px;background:rgba(0,0,0,.45);overflow:hidden;pointer-events:none}
+.bar b{display:block;height:100%;width:0;background:linear-gradient(90deg,#b9f26b,#ffe45c);border-radius:3px}
+.drop{position:absolute;top:1px;right:2px;font-size:11px;pointer-events:none;animation:twinkle 1s infinite alternate}
+.pest{position:absolute;inset:0;display:grid;place-items:center;font-size:min(7vw,32px);z-index:4;pointer-events:none;animation:wiggle .35s infinite alternate;filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))}
+.pest small{position:absolute;top:0;right:0;background:var(--red);color:#fff;font-size:10px;font-weight:900;border-radius:8px;padding:0 5px;border:1.5px solid #fff}
+.pest i{position:absolute;left:5px;right:5px;top:3px;height:3px;border-radius:2px;background:rgba(0,0,0,.4);overflow:hidden}
+.pest i b{display:block;height:100%;background:var(--red)}
+@keyframes wiggle{from{transform:rotate(-9deg) scale(1)}to{transform:rotate(9deg) scale(1.1)}}
+.burn{position:absolute;inset:0;display:grid;place-items:center;font-size:24px;pointer-events:none;animation:fade 2.5s forwards;z-index:3}
+@keyframes fade{to{opacity:0;transform:scale(1.6)}}
+.pop{animation:pop .22s}
+@keyframes pop{0%{transform:scale(.85)}60%{transform:scale(1.08)}}
+
+/* погода поверх поля */
+.wx-layer{position:absolute;inset:0;border-radius:18px;pointer-events:none;overflow:hidden;z-index:5}
+.wx-layer.rain,.wx-layer.storm{
+  background-image:linear-gradient(100deg,transparent 46%,rgba(210,235,255,.7) 48%,transparent 52%),linear-gradient(100deg,transparent 46%,rgba(210,235,255,.45) 48%,transparent 52%);
+  background-size:26px 46px,38px 70px; animation:rain .5s linear infinite;
+}
+.wx-layer.storm{background-color:rgba(20,25,60,.28)}
+.wx-layer.rain{background-color:rgba(40,80,140,.12)}
+@keyframes rain{to{background-position:-10px 46px,-14px 70px}}
+.wx-layer.heat{background:radial-gradient(circle at 85% 0%,rgba(255,190,40,.55),rgba(255,120,0,.12) 55%,transparent 75%);animation:heat 2s ease-in-out infinite alternate}
+@keyframes heat{to{opacity:.6}}
+.wx-layer.rainbow::before{content:"🌈";position:absolute;top:-6px;left:0;right:0;text-align:center;font-size:100px;line-height:1;opacity:.3}
+.wx-layer.flash{animation:flash .5s}
+@keyframes flash{0%,40%{background-color:rgba(255,255,255,.95)}20%{background-color:rgba(255,255,255,.2)}100%{background-color:rgba(20,25,60,.28)}}
+
+.sprite{position:absolute;left:0;top:0;font-size:30px;line-height:1;z-index:6;pointer-events:none;transition:transform .35s cubic-bezier(.3,1.4,.6,1);display:none;filter:drop-shadow(0 3px 2px rgba(0,0,0,.45))}
+.sprite.on{display:block}
+.sprite span{display:block}
+.sprite.hop span{animation:hop .35s}
+@keyframes hop{50%{transform:translateY(-14px) rotate(-8deg)}}
+.combo{position:absolute;top:-10px;right:6px;z-index:8;background:linear-gradient(#ff9f1c,#f3541d);color:#fff;font-weight:900;font-size:14px;padding:3px 10px;border-radius:14px;border:2px solid #fff;box-shadow:0 3px 6px rgba(0,0,0,.35);pointer-events:none;display:none}
+.combo.on{display:block;animation:pop .2s}
+.hint{position:absolute;left:50%;top:-12px;transform:translateX(-50%);z-index:9;max-width:92%;background:#fffbe9;border:2px solid #e2a100;border-radius:14px;padding:6px 12px;font-size:13.5px;font-weight:800;text-align:center;box-shadow:0 4px 10px rgba(0,0,0,.3);pointer-events:none;display:none;animation:bob 1.2s ease-in-out infinite}
+.hint.on{display:block}
+@keyframes bob{50%{transform:translateX(-50%) translateY(4px)}}
+.gift{position:absolute;left:-60px;top:20%;z-index:10;font-size:38px;line-height:1;cursor:pointer;animation:fly 12s linear forwards;filter:drop-shadow(0 4px 3px rgba(0,0,0,.35));padding:8px}
+.gift span{display:block;animation:bobg 1.4s ease-in-out infinite}
+.gift small{display:block;font-size:20px;margin-top:-8px;text-align:center}
+@keyframes fly{to{left:105%}}
+@keyframes bobg{50%{transform:translateY(-14px) rotate(6deg)}}
+
+/* ============ БУСТЫ / СОВЕТЫ ============ */
+.boosts{flex:none;min-height:24px;display:flex;gap:5px;align-items:center;justify-content:center;flex-wrap:nowrap;overflow:hidden}
+.bb{background:rgba(255,246,220,.95);border:2px solid var(--wood);border-radius:10px;padding:1px 7px;font-size:11.5px;font-weight:800;white-space:nowrap}
+.bb.low{border-color:var(--red);color:var(--red);animation:pulse .7s infinite}
+.tip{background:rgba(255,246,220,.85);border-radius:10px;padding:2px 10px;font-size:11.5px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+
+/* ============ СЕМЕНА ============ */
+.seeds{flex:none;display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;padding:3px 2px 5px;scrollbar-width:none;touch-action:pan-x;-webkit-overflow-scrolling:touch}
+.seeds::-webkit-scrollbar{display:none}
+.seed{flex:none;width:76px;height:66px;border-radius:14px;border:2px solid var(--wood);background:var(--cream);box-shadow:0 3px 0 var(--wood-d);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1;position:relative}
+.seed .e{font-size:24px;line-height:1.05}
+.seed .n{font-size:10.5px;font-weight:800;white-space:nowrap;max-width:72px;overflow:hidden;text-overflow:ellipsis}
+.seed .c{font-size:10.5px;font-weight:800;color:#8a6500;white-space:nowrap}
+.seed .c u{text-decoration:none;color:#2f7d0c}
+.seed.sel{background:#d9f7c1;border-color:var(--green-d);box-shadow:0 3px 0 #2c6410;transform:translateY(-3px)}
+.seed.cant .c{color:var(--red)}
+.seed.cant .e{filter:grayscale(.6);opacity:.7}
+.seed.lock{background:#ddd3b8;color:#8b7e63;box-shadow:none}
+.seed.lock .e{filter:grayscale(1);opacity:.5}
+.seed.tool{width:54px;background:#f6d9c8}
+.seed.tool.sel{background:#ffb4a8;border-color:var(--red);box-shadow:0 3px 0 #9a1f24}
+.seed .hotf{position:absolute;top:-5px;right:-4px;font-size:14px}
+
+/* ============ НИЖНЕЕ МЕНЮ ============ */
+.nav{flex:none;display:flex;gap:6px}
+.nav button{flex:1;height:50px;border-radius:14px;border:2px solid var(--wood);background:linear-gradient(#ffd98a,#ffb648);box-shadow:0 3px 0 var(--wood-d);font-size:11px;font-weight:900;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;position:relative}
+.nav button span{font-size:20px;line-height:1}
+.nav .dot{position:absolute;top:-6px;right:-2px;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;line-height:18px;padding:0 4px;border:1.5px solid #fff;display:none}
+.nav .dot.on{display:block}
+
+/* ============ ВСПЛЫВАЮЩЕЕ ============ */
+#fx{position:fixed;inset:0;pointer-events:none;z-index:900;overflow:hidden}
+.ft{position:absolute;font-weight:900;font-size:16px;color:#fff;text-shadow:0 1px 0 #000,0 0 4px rgba(0,0,0,.8);white-space:nowrap;transform:translate(-50%,-50%)}
+.ft.gold{color:var(--gold);font-size:20px}
+.ft.xp{color:#b8f5ff;font-size:13px}
+.ft.bad{color:#ff8f8f}
+.pt{position:absolute;font-size:18px;line-height:1;transform:translate(-50%,-50%)}
+.cf{position:absolute;width:9px;height:14px;top:-20px;border-radius:2px}
+#toasts{position:fixed;left:0;right:0;top:calc(58px + env(safe-area-inset-top));display:flex;flex-direction:column;align-items:center;gap:5px;z-index:950;pointer-events:none}
+.toast{background:rgba(50,30,10,.93);color:#fff;font-weight:800;font-size:13.5px;padding:7px 14px;border-radius:14px;max-width:88vw;text-align:center;animation:toast 2.6s forwards;box-shadow:0 4px 12px rgba(0,0,0,.35)}
+@keyframes toast{0%{opacity:0;transform:translateY(-10px)}8%,85%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-8px)}}
+
+.backdrop{position:fixed;inset:0;background:rgba(20,12,4,.55);z-index:500;display:none}
+.backdrop.on{display:block}
+.sheet{position:fixed;left:50%;bottom:0;width:100%;max-width:500px;transform:translate(-50%,105%);transition:transform .25s;z-index:510;background:var(--cream);border:3px solid var(--wood);border-bottom:none;border-radius:22px 22px 0 0;max-height:78vh;max-height:78dvh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+.sheet.on{transform:translate(-50%,0)}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 8px 16px;font-size:18px;font-weight:900;border-bottom:2px dashed #dcc48a;flex:none}
+.sheet-h button{width:36px;height:36px;border-radius:50%;background:#f0dba6;border:2px solid var(--wood);font-size:16px;font-weight:900}
+.sheet-b{overflow-y:auto;padding:10px 12px 14px;display:flex;flex-direction:column;gap:8px;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.row{display:flex;align-items:center;gap:10px;background:#fffdf2;border:2px solid #e3cf9b;border-radius:14px;padding:8px 10px}
+.row .ic{font-size:28px;flex:none;width:36px;text-align:center}
+.row .tx{flex:1;min-width:0;font-size:12.5px;line-height:1.25}
+.row .tx b{font-size:14.5px;display:block}
+.row .tx em{font-style:normal;color:#2f7d0c;font-weight:800}
+.row.done{background:#e6f7d6;border-color:#a9d98a}
+.row.locked{opacity:.6}
+.buy{flex:none;min-width:78px;padding:8px 10px;border-radius:12px;background:linear-gradient(#8fd858,#5cb82f);color:#fff;font-weight:900;font-size:13.5px;box-shadow:0 3px 0 #2c6410;text-shadow:0 1px 0 rgba(0,0,0,.3);white-space:nowrap}
+.buy:active{transform:translateY(2px);box-shadow:0 1px 0 #2c6410}
+.buy.cant{background:linear-gradient(#d6cfc0,#b9b09c);box-shadow:0 3px 0 #857c69}
+.buy.alt{background:linear-gradient(#ffd98a,#ffab2e);box-shadow:0 3px 0 #a86200;color:#5a3300;text-shadow:none}
+.buy.red{background:linear-gradient(#ff8f8f,#e5484d);box-shadow:0 3px 0 #8f1d21}
+.buy[disabled]{background:#cfc9ba;box-shadow:none;color:#fff}
+.pips{display:flex;gap:3px;margin-top:3px}
+.pips i{width:14px;height:6px;border-radius:3px;background:#e0d2a6}
+.pips i.f{background:var(--green)}
+.sub{font-size:12px;font-weight:800;color:#8a6f3c;margin:4px 2px 0}
+textarea.save{width:100%;height:70px;border:2px solid #e3cf9b;border-radius:10px;padding:6px;font-size:11px;font-family:monospace;user-select:text;-webkit-user-select:text;resize:none;background:#fff}
+
+.modal{position:fixed;inset:0;z-index:700;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(20,12,4,.6)}
+.modal.on{display:flex}
+.mbox{background:var(--cream);border:3px solid var(--wood);border-radius:22px;box-shadow:0 8px 0 var(--wood-d),0 16px 40px rgba(0,0,0,.5);padding:18px 16px 16px;width:100%;max-width:380px;text-align:center;animation:pop .25s;max-height:86vh;overflow-y:auto}
+.mbox .big{font-size:54px;line-height:1.1}
+.mbox h2{font-size:21px;margin:4px 0 8px}
+.mbox p{font-size:14px;line-height:1.4;margin-bottom:8px}
+.mbox ul{list-style:none;text-align:left;font-size:13.5px;line-height:1.5;margin:0 4px 10px}
+.mbox .btns{display:flex;gap:8px;justify-content:center;margin-top:10px}
+.mbox .buy{min-width:110px;padding:11px 14px;font-size:15px}
+</style>
+</head>
+<body>
+<audio id="bgMusic" preload="none"></audio>
+
+<div id="app">
+  <div class="hud">
+    <div class="lvl card" id="lvlBox">
+      <div class="star">⭐<b id="lvlNum">1</b></div>
+      <div class="xp"><i id="xpFill"></i><span id="xpTxt"></span></div>
+    </div>
+    <div class="pill card" id="coinBox">🪙 <span id="moneyTxt">0</span></div>
+    <div class="pill card water" id="waterBox">💧 <span id="waterTxt">0</span></div>
+    <button class="ibtn card" id="menuBtn" aria-label="Меню">⚙️</button>
+  </div>
+
+  <div class="info">
+    <div class="chip wx" id="wxChip"></div>
+    <div class="chip hot" id="hotChip"></div>
+    <button class="chip mus" id="musBtn" aria-label="Музыка">🔇</button>
+  </div>
+
+  <div class="orders" id="ordersRow"></div>
+  <div class="areas" id="areaTabs"></div>
+
+  <div class="field-wrap">
+    <div class="field-box" id="fieldBox">
+      <div class="field" id="field"></div>
+      <div class="wx-layer" id="wxLayer"></div>
+      <div class="sprite" id="workerSpr"><span>👨‍🌾</span></div>
+      <div class="sprite" id="dogSpr"><span>🐕</span></div>
+      <div class="combo" id="comboBox"></div>
+      <div class="hint" id="hintBox"></div>
+    </div>
+  </div>
+
+  <div class="boosts" id="boostRow"></div>
+  <div class="seeds" id="seedStrip"></div>
+
+  <div class="nav">
+    <button data-sheet="orders"><span>📋</span>Заказы<i class="dot" id="dotOrders"></i></button>
+    <button data-sheet="shop"><span>🧰</span>Помощники</button>
+    <button data-sheet="upg"><span>⬆️</span>Улучшения<i class="dot" id="dotUpg"></i></button>
+    <button data-sheet="ach"><span>🏆</span>Награды</button>
+  </div>
+</div>
+
+<div id="fx"></div>
+<div id="toasts"></div>
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-h"><span id="sheetTitle"></span><button id="sheetClose">✕</button></div>
+  <div class="sheet-b" id="sheetBody"></div>
+</div>
+<div class="modal" id="modal"><div class="mbox" id="mbox"></div></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   ФЕРМА АНТОШИ 3
+   Данные игры: культуры, участки, помощники, улучшения, награды
+   ===================================================================== */
+const SAVE_KEY = 'antonFarmSave3';
+
+// k: veg — овощи (сажаем каждый раз), tree — деревья (сажаем один раз, плоды растут снова),
+//    animal — животные (дают продукт сами, копится до 3 штук)
+// t — секунды роста, cost — цена семян/саженца/животного, sell — цена продажи одной штуки
+const V = (id, n, e, lvl, t, cost, sell) => ({ id, k: 'veg', n, e, lvl, t, cost, sell });
+const T = (id, n, e, lvl, t, cost, sell, body) => ({ id, k: 'tree', n, e, lvl, t, cost, sell, body: body || '🌳' });
+const A = (id, n, body, e, pn, lvl, t, cost, sell) => ({ id, k: 'animal', n, e, pn, lvl, t, cost, sell, body });
+
+const ITEMS = [
+  // ---- Огород и теплица ----
+  V('carrot',  'Морковь',   '🥕', 1,  20,    2,    5),
+  V('onion',   'Лук',       '🧅', 2,  45,    4,   12),
+  V('potato',  'Картошка',  '🥔', 3,  90,    8,   28),
+  V('broc',    'Брокколи',  '🥦', 4,  40,   12,   24),
+  V('corn',    'Кукуруза',  '🌽', 5, 150,   20,   75),
+  V('tomato',  'Помидор',   '🍅', 6,  60,   30,   62),
+  V('eggpl',   'Баклажан',  '🍆', 7, 240,   50,  210),
+  V('pumpkin', 'Тыква',     '🎃', 9,  90,   90,  180),
+  V('straw',   'Клубника',  '🍓', 11, 120,  150,  320),
+  V('melon',   'Арбуз',     '🍉', 13, 360,  220,  950),
+  V('cucu',    'Огурец',    '🥒', 15,  75,  340,  570),
+  V('pepper',  'Перец',     '🌶️', 17, 180,  550, 1400),
+  V('cabbage', 'Капуста',   '🥬', 19, 480,  800, 4000),
+  V('sunfl',   'Подсолнух', '🌻', 21, 100, 1600, 2650),
+  V('batat',   'Батат',     '🍠', 23, 300, 2600, 7800),
+  V('mush',    'Грибы',     '🍄', 25, 150, 4500, 8500),
+  // ---- Сад ----
+  T('blueb',  'Черника',   '🫐', 5,   60,   180,    16),
+  T('grape',  'Виноград',  '🍇', 7,   90,   350,    48),
+  T('lemon',  'Лимон',     '🍋', 9,  120,   650,   115),
+  T('orange', 'Апельсин',  '🍊', 11, 150,  1100,   250),
+  T('cherry', 'Вишня',     '🍒', 13, 100,  1700,   260),
+  T('peach',  'Персик',    '🍑', 15, 180,  2600,   720),
+  T('pear',   'Груша',     '🍐', 17, 240,  4100,  1500),
+  T('apple',  'Яблоня',    '🍎', 19, 200,  6600,  2000),
+  T('coco',   'Кокос',     '🥥', 21, 300,  9200,  4200, '🌴'),
+  T('mango',  'Манго',     '🥭', 23, 240, 15000,  5400),
+  T('banana', 'Банан',     '🍌', 25, 260, 22000,  8500, '🌴'),
+  T('pinea',  'Ананас',    '🍍', 27, 400, 30000, 18000, '🌴'),
+  T('avoc',   'Авокадо',   '🥑', 29, 320, 41000, 20000),
+  // ---- Двор ----
+  A('chicken', 'Курица',  '🐔', '🥚', 'яйцо',     8,  45,   380,   26),
+  A('sheep',   'Овечка',  '🐑', '🧶', 'шерсть',  10,  90,   730,  100),
+  A('cow',     'Корова',  '🐄', '🥛', 'молоко',  13, 120,  1650,  300),
+  A('bee',     'Пчёлы',   '🐝', '🍯', 'мёд',     16, 150,  3500,  800),
+  A('goat',    'Коза',    '🐐', '🧀', 'сыр',     18, 160,  5400, 1300),
+  A('pig',     'Свинка',  '🐖', '🍄', 'трюфель', 20, 240,  8000, 2900),
+  A('duck',    'Золотая утка', '🦆', '🥇', 'золотое яйцо', 24, 300, 16500, 7500),
+];
+const ITEM = {};
+ITEMS.forEach(it => { ITEM[it.id] = it; });
+
+const AREAS = [
+  { id: 'veg',    name: 'Огород',  icon: '🥕', kind: 'veg',    lvl: 1,  price: 0,     plotBase: 10,   plotGrow: 1.45, start: [6, 7, 11, 12] },
+  { id: 'garden', name: 'Сад',     icon: '🍎', kind: 'tree',   lvl: 5,  price: 800,   plotBase: 150,  plotGrow: 1.33, start: [6, 7, 8],
+    about: 'Дерево сажаешь <b>один раз</b>, а плоды собираешь снова и снова! Саженец стоит дорого, зато потом — чистая прибыль.' },
+  { id: 'yard',   name: 'Двор',    icon: '🐄', kind: 'animal', lvl: 8,  price: 6000,  plotBase: 600,  plotGrow: 1.33, start: [6, 7, 8],
+    about: 'Животные сами дают яйца, шерсть и молоко. Продукты <b>копятся до 3 штук</b> — можно заглядывать пореже. Береги их от лисы 🦊!' },
+  { id: 'green',  name: 'Теплица', icon: '🏡', kind: 'veg',    lvl: 12, price: 40000, plotBase: 4000, plotGrow: 1.30, start: [6, 7, 11, 12], indoor: true, speed: 1.5,
+    about: 'В теплице овощи растут <b>в 1,5 раза быстрее</b>, им не страшны ни жара, ни гроза.' },
+];
+const WILD = ['🌿', '🌿', '🪨', '🌲', '🪵', '🌾', '🌿', '🍂'];
+
+// Помощники: sec — цена в «секундах дохода фермы», dur — сколько секунд работает
+const BOOSTS = [
+  { id: 'dog',    ic: '🐕',  name: 'Пёс Шарик',        desc: 'Сам прогоняет всех вредителей',                         sec: 20, dur: 300, lvl: 2 },
+  { id: 'insure', ic: '🛡️', name: 'Страховка',        desc: 'Вернёт монеты за урожай, который съели или сожгла молния', sec: 15, dur: 600, lvl: 3 },
+  { id: 'manure', ic: '💩',  name: 'Навоз',            desc: 'Всё растёт в 2 раза быстрее. Но вредители лезут чаще!',   sec: 45, dur: 120, lvl: 3 },
+  { id: 'worker', ic: '👨‍🌾', name: 'Работник Петрович', desc: 'Сам собирает урожай и сажает выбранные семена',          sec: 40, dur: 300, lvl: 4 },
+  { id: 'clover', ic: '🍀',  name: 'Клевер удачи',     desc: 'Золотой урожай ✨ выпадает в 2,5 раза чаще',              sec: 35, dur: 180, lvl: 6 },
+];
+const BOOST = {};
+BOOSTS.forEach(b => { BOOST[b.id] = b; });
+
+// Постоянные улучшения
+const UPGRADES = [
+  { id: 'well',   ic: '🪣', name: 'Глубокий колодец', desc: l => `Воды: ${10 + 4 * l} 💧, набирается быстрее`,          cost: [40, 200, 900, 4000, 18000] },
+  { id: 'sprink', ic: '🚿', name: 'Автополив',        desc: l => `Всё растёт быстрее на ${10 * l}%`,                   cost: [150, 700, 3000, 12000, 50000, 200000, 800000] },
+  { id: 'basket', ic: '🧺', name: 'Большая корзина',  desc: l => `Урожай продаётся дороже на ${10 * l}%`,              cost: [300, 1500, 7000, 30000, 120000, 500000, 2000000] },
+  { id: 'gold',   ic: '✨', name: 'Золотые руки',     desc: l => `Шанс золотого урожая: ${10 + 2 * l}%`,               cost: [400, 2000, 9000, 40000, 160000, 600000] },
+  { id: 'team',   ic: '⏱️', name: 'Дружная команда',  desc: l => `Помощники работают дольше на ${50 * l}%`,            cost: [500, 3000, 15000, 60000] },
+  { id: 'rod',    ic: '⚡', name: 'Громоотвод',       desc: () => 'Молния больше не бьёт по грядкам',                  cost: [6000], lvl: 4 },
+  { id: 'palace', ic: '🏰', name: 'Дворец фермера',   desc: () => 'Главная мечта! Построй дворец — и стань лучшим фермером на свете', cost: [20000000], lvl: 15 },
+];
+const UPG = {};
+UPGRADES.forEach(u => { UPG[u.id] = u; });
+
+// Погода
+const WX = {
+  sun:     { ic: '☀️', name: 'Солнечно', dur: [90, 150], about: 'Обычная погода: всё растёт как положено.' },
+  rain:    { ic: '🌧️', name: 'Дождь',    dur: [50, 80],  about: 'Дождь сам поливает грядки — всё растёт в 2 раза быстрее!' },
+  heat:    { ic: '🥵', name: 'Жара',     dur: [50, 80],  about: 'Жара! Неполитые грядки растут медленнее. Поливай 💧' },
+  storm:   { ic: '⛈️', name: 'Гроза',    dur: [35, 50],  about: 'Молния может сжечь урожай! Собери спелое, купи страховку или громоотвод.' },
+  rainbow: { ic: '🌈', name: 'Радуга',   dur: [40, 45],  about: 'Радуга! Золотой урожай выпадает в 3 раза чаще.' },
+};
+
+// Вредители: hp — сколько раз тапнуть, t — через сколько секунд съест урожай
+const PESTS = {
+  bug:   { e: '🐛', n: 'Гусеница', hp: [1, 1], t: 13 },
+  snail: { e: '🐌', n: 'Улитка',   hp: [3, 4], t: 20 },
+  hare:  { e: '🐇', n: 'Заяц',     hp: [1, 1], t: 8 },
+  fox:   { e: '🦊', n: 'Лиса',     hp: [2, 2], t: 11 },
+  mouse: { e: '🐭', n: 'Мышь',     hp: [1, 1], t: 10 },
+};
+const PEST_TABLE = {
+  veg:    [['bug', 55], ['snail', 30], ['hare', 15]],
+  indoor: [['snail', 50], ['mouse', 50]],
+  tree:   [['hare', 45], ['snail', 30], ['bug', 25]],
+  animal: [['fox', 65], ['mouse', 35]],
+};
+
+const CUSTOMERS = [
+  ['👵', 'Бабушка Зина', 'Напеку пирогов на всю деревню!'],
+  ['👨‍🍳', 'Повар Жора', 'Срочно нужно для супа дня!'],
+  ['🐱', 'Кот Барсик', 'Мяу! То есть… несите еду.'],
+  ['👧', 'Маша', 'Это для школьной ярмарки!'],
+  ['🧑‍🚀', 'Космонавт Юра', 'Беру с собой на орбиту!'],
+  ['🤡', 'Клоун Бим', 'Буду этим жонглировать!'],
+  ['👴', 'Сосед Иваныч', 'У меня в этом году не уродилось…'],
+  ['🦸', 'Супергерой', 'Героям нужны витамины!'],
+  ['👸', 'Принцесса', 'Завтра королевский пир!'],
+  ['🤖', 'Робот Вася', 'БИП. ТРЕБУЕТСЯ ТОПЛИВО. БИП.'],
+  ['🧙', 'Волшебник', 'Нужно для одного зелья…'],
+  ['🏴‍☠️', 'Пират Джо', 'Йо-хо-хо! Запасаюсь в плавание!'],
+];
+
+// Награды: st — имя счётчика в S.stats (или функция), goal — цель, coins — приз
+const ACHS = [
+  { id: 'h1',    ic: '🥕', name: 'Первый урожай',       desc: 'Собери первый урожай',        st: 'harv',   goal: 1,     coins: 5 },
+  { id: 'h50',   ic: '🧑‍🌾', name: 'Юный фермер',         desc: 'Собери 50 урожаев',           st: 'harv',   goal: 50,    coins: 60 },
+  { id: 'h500',  ic: '🚜', name: 'Опытный фермер',      desc: 'Собери 500 урожаев',          st: 'harv',   goal: 500,   coins: 800 },
+  { id: 'h3000', ic: '👑', name: 'Король урожая',       desc: 'Собери 3000 урожаев',         st: 'harv',   goal: 3000,  coins: 15000 },
+  { id: 'g10',   ic: '✨', name: 'Золотая лихорадка',   desc: 'Собери 10 золотых урожаев',   st: 'gold',   goal: 10,    coins: 150 },
+  { id: 'g100',  ic: '🏅', name: 'Золотых дел мастер',  desc: 'Собери 100 золотых урожаев',  st: 'gold',   goal: 100,   coins: 5000 },
+  { id: 'p20',   ic: '🐛', name: 'Гроза вредителей',    desc: 'Прогони 20 вредителей',       st: 'pests',  goal: 20,    coins: 100 },
+  { id: 'p200',  ic: '🥊', name: 'Защитник полей',      desc: 'Прогони 200 вредителей',      st: 'pests',  goal: 200,   coins: 4000 },
+  { id: 'o5',    ic: '📋', name: 'Надёжный поставщик',  desc: 'Выполни 5 заказов',           st: 'orders', goal: 5,     coins: 200 },
+  { id: 'o50',   ic: '🚚', name: 'Главный по заказам',  desc: 'Выполни 50 заказов',          st: 'orders', goal: 50,    coins: 8000 },
+  { id: 'c10',   ic: '🔥', name: 'Комбо-мастер',        desc: 'Набери комбо ×10',            st: 'combo',  goal: 10,    coins: 250 },
+  { id: 'b10',   ic: '🎈', name: 'Ловец шариков',       desc: 'Поймай 10 шариков с подарком', st: 'gifts', goal: 10,    coins: 400 },
+  { id: 'w100',  ic: '💧', name: 'Водолей',             desc: 'Полей грядки 100 раз',        st: 'water',  goal: 100,   coins: 200 },
+  { id: 'pl16',  ic: '🌿', name: 'Землевладелец',       desc: 'Купи 16 грядок',              st: 'plots',  goal: 16,    coins: 500 },
+  { id: 'a2',    ic: '🍎', name: 'Садовод',             desc: 'Открой Сад',                  st: s => s.areas[1].unlocked ? 1 : 0, goal: 1, coins: 300 },
+  { id: 'a3',    ic: '🐄', name: 'Животновод',          desc: 'Открой Двор',                 st: s => s.areas[2].unlocked ? 1 : 0, goal: 1, coins: 1500 },
+  { id: 'a4',    ic: '🏡', name: 'Тепличник',           desc: 'Открой Теплицу',              st: s => s.areas[3].unlocked ? 1 : 0, goal: 1, coins: 8000 },
+  { id: 'l10',   ic: '⭐', name: 'Десятый уровень',     desc: 'Достигни 10 уровня',          st: s => s.level, goal: 10, coins: 1000 },
+  { id: 'l20',   ic: '🌟', name: 'Двадцатый уровень',   desc: 'Достигни 20 уровня',          st: s => s.level, goal: 20, coins: 30000 },
+  { id: 'm1',    ic: '💰', name: 'Миллионер',           desc: 'Заработай миллион монет',     st: 'earned', goal: 1e6,   coins: 100000 },
+];
+
+const TIPS = [
+  '💡 Веди пальцем по грядкам — так быстрее',
+  '💡 Тап по ростку — полив, растёт вдвое быстрее',
+  '💡 Собирай подряд без пауз — растёт комбо',
+  '💡 Товар дня 🔥 продаётся вдвое дороже',
+  '💡 Перед грозой ⛈️ собери всё спелое',
+  '💡 Лови шарик 🎈 — в нём подарок',
+  '💡 За заказы дают много опыта ⭐',
+  '💡 Деревья и животные работают без тебя',
+  '💡 Топорик 🪓 убирает ненужные посадки',
+  '💡 Тапни по погоде — узнаешь, что она делает',
+];
+
+// Формулы
+const xpNeed = lvl => Math.round(10 * Math.pow(lvl, 2.6)) + 4;
+const itemXp = it => Math.max(1, Math.round(0.8 * Math.sqrt(it.sell)));
+function nice(n) {
+  if (n < 20) return Math.max(1, Math.round(n));
+  const p = Math.pow(10, Math.floor(Math.log10(n)) - 1);
+  return Math.round(n / p) * p;
+}
+
+/* =====================================================================
+   СОСТОЯНИЕ ИГРЫ
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const rint = (a, b) => Math.floor(rnd(a, b + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+let S = null;            // всё, что сохраняется
+let tool = 'hand';       // 'hand' или 'remove' (топорик)
+let combo = 0, comboLeft = 0;
+let pestClock = 0, workerClock = 0, dogClock = 0, giftClock = rnd(50, 80), tipClock = 0, tipIdx = 0, saveClock = 0;
+let pendingRemove = null;
+const burns = {};        // следы молнии: "участок:грядка" -> секунды
+
+function newPlot() {
+  return { st: 'wild', deco: pick(WILD), item: null, t: 0, total: 0, n: 0, gold: false, wet: 0, pest: null, mature: false };
+}
+function freshState() {
+  const s = {
+    v: 3, money: 15, xp: 0, level: 1, water: 10, areaIdx: 0,
+    areas: AREAS.map(() => ({ unlocked: false, sel: null, bought: 0, plots: Array.from({ length: 20 }, newPlot) })),
+    boosts: { dog: 0, insure: 0, manure: 0, worker: 0, clover: 0 },
+    up: { well: 0, sprink: 0, basket: 0, gold: 0, team: 0, rod: 0, palace: 0 },
+    weather: { cur: 'sun', left: 110, next: 'rain', strikes: [] },
+    hot: { item: null, left: 0 },
+    orders: [null, { wait: 70 }, { wait: 200 }],
+    stats: { harv: 0, gold: 0, pests: 0, orders: 0, earned: 0, gifts: 0, plots: 0, water: 0, combo: 0 },
+    ach: {}, tut: 0, sound: true, music: false, last: Date.now(),
+  };
+  openArea(s, 0);
+  s.orders[0] = { who: 0, need: [{ item: 'carrot', qty: 6, got: 0 }], coins: 25, xp: 12 };
+  return s;
+}
+function openArea(s, ai) {
+  const a = s.areas[ai], d = AREAS[ai];
+  a.unlocked = true;
+  d.start.forEach(i => { a.plots[i].st = 'empty'; });
+  const first = ITEMS.find(it => it.k === d.kind);
+  a.sel = first ? first.id : null;
+}
+
+// ---------- сохранение ----------
+function save() {
+  if (!S) return;
+  S.last = Date.now();
+  const playing = S.music; S.music = playing || wantMusic;      // запоминаем, что музыка была включена
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* хранилище недоступно */ }
+  S.music = playing;
+}
+function normalize(s) {
+  // подстраховка: если в сохранении чего-то не хватает (старая версия) — берём из свежего состояния
+  const f = freshState();
+  for (const k in f) if (s[k] === undefined) s[k] = f[k];
+  ['boosts', 'up', 'stats', 'weather', 'hot'].forEach(k => { for (const x in f[k]) if (s[k][x] === undefined) s[k][x] = f[k][x]; });
+  while (s.areas.length < AREAS.length) s.areas.push(f.areas[s.areas.length]);
+  s.areas.forEach(a => a.plots.forEach(p => { if (p.item && !ITEM[p.item]) { p.item = null; p.st = 'empty'; p.n = 0; } }));
+  s.areas.forEach(a => { if (a.sel && !ITEM[a.sel]) a.sel = null; });
+  if (!WX[s.weather.cur]) s.weather = f.weather;
+  if (!s.areas[s.areaIdx] || !s.areas[s.areaIdx].unlocked) s.areaIdx = 0;
+  return s;
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) { const s = JSON.parse(raw); if (s && Array.isArray(s.areas) && typeof s.money === 'number') return normalize(s); }
+  } catch (e) { /* битое сохранение — начинаем заново */ }
+  return null;
+}
+
+/* =====================================================================
+   ЭКОНОМИКА
+   ===================================================================== */
+const curArea = () => S.areas[S.areaIdx];
+const curDef = () => AREAS[S.areaIdx];
+const waterCap = () => 10 + 4 * S.up.well;
+const waterRegen = () => 4 / (1 + 0.3 * S.up.well);       // секунд на одну каплю
+const teamMult = () => 1 + 0.5 * S.up.team;
+const isRain = () => S.weather.cur === 'rain' || S.weather.cur === 'storm';
+
+function plotPrice(ai) { const d = AREAS[ai]; return nice(d.plotBase * Math.pow(d.plotGrow, S.areas[ai].bought)); }
+function bestVegRate() {
+  let r = 0;
+  for (const it of ITEMS) if (it.k === 'veg' && it.lvl <= S.level) r = Math.max(r, (it.sell - it.cost) / it.t);
+  return r;
+}
+// Примерный доход фермы в секунду — от него считаются цены помощников и размер призов
+function income() {
+  let s = 0; const bv = bestVegRate();
+  S.areas.forEach((a, ai) => {
+    if (!a.unlocked) return;
+    const d = AREAS[ai];
+    a.plots.forEach(p => {
+      if (p.st === 'wild') return;
+      if (d.kind === 'veg') s += bv * (d.speed || 1);
+      else if (p.item) s += ITEM[p.item].sell / ITEM[p.item].t;
+    });
+  });
+  return Math.max(0.5, s);
+}
+const boostPrice = b => nice(b.sec * income());
+const prize = sec => Math.max(3, nice(sec * income()));
+
+function goldChance() {
+  let c = 0.10 + 0.02 * S.up.gold;
+  if (S.boosts.clover > 0) c *= 2.5;
+  if (S.weather.cur === 'rainbow') c *= 3;
+  return Math.min(0.85, c);
+}
+function speedOf(ai, p) {
+  if (p.pest) return 0;
+  const d = AREAS[ai];
+  let s = (d.speed || 1) * (1 + 0.1 * S.up.sprink);
+  if (S.boosts.manure > 0) s *= 2;
+  if (p.wet > 0 || (!d.indoor && isRain())) s *= 2;
+  else if (!d.indoor && S.weather.cur === 'heat') s *= 0.6;
+  return s;
+}
+function addMoney(n) { S.money += n; if (n > 0) S.stats.earned += n; hudDirty = true; }
+function spend(n) { if (S.money < n) return false; S.money -= n; hudDirty = true; return true; }
+function addXp(n) {
+  S.xp += n; hudDirty = true;
+  while (S.xp >= xpNeed(S.level)) { S.xp -= xpNeed(S.level); S.level++; onLevelUp(); }
+}
+function onLevelUp() {
+  const L = S.level, gift = prize(60);
+  addMoney(gift); S.water = waterCap();
+  const news = [];
+  ITEMS.filter(it => it.lvl === L).forEach(it => news.push(`${it.k === 'veg' ? it.e : it.body} ${it.n}${it.k === 'tree' ? ' (в Саду)' : it.k === 'animal' ? ' (во Дворе)' : ''}`));
+  AREAS.forEach(d => { if (d.lvl === L) news.push(`${d.icon} Можно открыть: <b>${d.name}</b>`); });
+  BOOSTS.forEach(b => { if (b.lvl === L) news.push(`${b.ic} Помощник: ${b.name}`); });
+  if (L === 2) news.push('🐛 Берегись: появились вредители! Тапай по ним.');
+  if (L === 3) news.push('🥵 Теперь бывает жара — поливай грядки');
+  if (L === 4) news.push('⛈️ Теперь бывают грозы — следи за прогнозом');
+  S.areas.forEach((a, ai) => { if (a.unlocked && !a.sel) { const f = ITEMS.find(it => it.k === AREAS[ai].kind && it.lvl <= L); if (f) a.sel = f.id; } });
+  queueModal(`<div class="big">🎉</div><h2>Уровень ${L}!</h2><p>Подарок: <b>+${fmt(gift)} 🪙</b> и полный колодец 💧</p>` +
+    (news.length ? `<ul>${news.map(x => `<li>🆕 ${x}</li>`).join('')}</ul>` : '') +
+    `<div class="btns"><button class="buy" data-close>Ура!</button></div>`, () => { confetti(); sfx('level'); });
+  renderSeeds(); renderTabs(); save();
+}
+
+/* =====================================================================
+   ДЕЙСТВИЯ НА ГРЯДКАХ
+   ===================================================================== */
+function clearPlot(p) { p.st = 'empty'; p.item = null; p.t = 0; p.total = 0; p.n = 0; p.gold = false; p.mature = false; p.pest = null; }
+
+// что произойдёт при тапе по грядке
+function kindFor(i) {
+  const p = curArea().plots[i];
+  if (p.pest) return 'whack';
+  if (p.st === 'wild') return 'buy';
+  if (tool === 'remove') return 'remove';
+  if (p.n > 0) return 'harvest';
+  if (p.st === 'empty') return 'plant';
+  if (p.st === 'grow') return 'water';
+  return null;
+}
+function tapPlot(i, dragging) {
+  const k = kindFor(i);
+  if (k === 'whack') { whack(S.areaIdx, i, true); return k; }
+  if (k === 'buy') { if (!dragging) buyPlot(i); return k; }
+  if (k === 'remove') { if (!dragging) removePlant(i); return k; }
+  if (k === 'harvest') { harvest(S.areaIdx, i, true); return k; }
+  if (k === 'plant') { if (dragging && curDef().kind !== 'veg') return null; return plant(S.areaIdx, i, true) ? k : null; }
+  if (k === 'water') { return water(i) ? k : (dragging ? null : k); }
+  return null;
+}
+
+function buyPlot(i) {
+  const a = curArea(), p = a.plots[i], price = plotPrice(S.areaIdx);
+  if (!spend(price)) { toast(`Нужно ${fmt(price)} 🪙, чтобы расчистить грядку`); sfx('err'); return; }
+  p.st = 'empty'; a.bought++; S.stats.plots++;
+  const c = plotCenter(i);
+  burst(c.x, c.y, ['🍃', '🌿', '💨'], 7); floatText(c.x, c.y, `−${short(price)}🪙`, 'bad'); sfx('buy'); vib(15);
+  if (S.tut === 3) S.tut = 4;
+}
+
+function plant(ai, i, manual) {
+  const a = S.areas[ai], p = a.plots[i], it = ITEM[a.sel];
+  if (!it || it.lvl > S.level || it.k !== AREAS[ai].kind) { if (manual) toast('Сначала выбери, что сажать 👇'); return false; }
+  if (!spend(it.cost)) { if (manual) { toast(`Не хватает монет: ${it.n} стоит ${fmt(it.cost)} 🪙`); sfx('err'); } return false; }
+  p.st = 'grow'; p.item = it.id; p.n = 0; p.gold = false; p.wet = 0; p.pest = null;
+  p.mature = it.k === 'animal';
+  p.total = p.t = it.k === 'tree' ? it.t * 2 : it.t;      // саженец растёт вдвое дольше обычного плода
+  if (ai === S.areaIdx) {
+    const c = plotCenter(i);
+    if (manual) { sfx('plant'); vib(8); }
+    if (it.cost >= 100 && manual) floatText(c.x, c.y, `−${short(it.cost)}🪙`, 'bad');
+  }
+  if (manual && S.tut === 0) S.tut = 1;
+  return true;
+}
+
+function water(i) {
+  const p = curArea().plots[i];
+  if (p.wet > 4) return false;
+  if (!curDef().indoor && isRain()) return false;       // дождь и так поливает
+  if (S.water < 1) { toast('💧 Вода кончилась — подожди, колодец наберётся'); return false; }
+  S.water -= 1; p.wet = 30; S.stats.water++; hudDirty = true;
+  const c = plotCenter(i);
+  burst(c.x, c.y - 8, ['💧'], 3); sfx('water');
+  if (S.tut === 1) S.tut = 2;
+  return true;
+}
+
+// продукт созрел
+function ripen(p) {
+  const it = ITEM[p.item];
+  p.mature = true; p.n++;
+  if (Math.random() < goldChance()) p.gold = true;
+  if (it.k === 'animal' && p.n < 3) { p.t += it.t; p.total = it.t; }
+  else { p.st = 'ready'; p.t = 0; }
+}
+
+function harvest(ai, i, manual) {
+  const a = S.areas[ai], p = a.plots[i], it = ITEM[p.item];
+  if (!it || p.n < 1) return;
+  const n = p.n, units = n + (p.gold ? 2 : 0);            // золотой = втрое дороже
+  let mult = 1 + 0.1 * S.up.basket;
+  if (S.up.palace) mult *= 1.5;
+  if (S.hot.item === it.id) mult *= 2;
+  if (manual) {
+    combo = comboLeft > 0 ? combo + 1 : 1; comboLeft = 2.5;
+    if (combo > S.stats.combo) S.stats.combo = combo;
+    mult *= 1 + Math.min(combo - 1, 10) * 0.05;
+  }
+  const gain = Math.round(it.sell * units * mult), xp = itemXp(it) * n + (p.gold ? itemXp(it) : 0);
+  addMoney(gain); S.stats.harv += n; if (p.gold) S.stats.gold++;
+  S.orders.forEach(o => { if (o && o.need) o.need.forEach(q => { if (q.item === it.id) q.got = Math.min(q.qty, q.got + n); }); });
+  const wasGold = p.gold;
+  if (it.k === 'veg') clearPlot(p);
+  else { p.n = 0; p.gold = false; if (p.st === 'ready') { p.st = 'grow'; p.t = p.total = it.t; } }
+  if (ai === S.areaIdx) {
+    const c = plotCenter(i);
+    floatText(c.x, c.y - 6, `+${short(gain)}`, wasGold ? 'gold' : '');
+    coinsFly(c.x, c.y, wasGold ? 7 : 3, it.e);
+    if (wasGold) { sfx('gold'); burst(c.x, c.y, ['✨', '⭐'], 8); vib([10, 30, 10]); }
+    else if (manual) { sfx('harvest', combo); vib(8); }
+  }
+  addXp(xp);
+  if (manual && S.tut < 3) S.tut = 3;
+}
+
+function removePlant(i) {
+  const a = curArea(), p = a.plots[i], it = ITEM[p.item];
+  if (!it) { toast('Здесь нечего убирать'); return; }
+  const back = it.k === 'veg' ? 0 : Math.floor(it.cost / 2);
+  if (pendingRemove !== i) {
+    pendingRemove = i;
+    toast(`Тапни ещё раз, чтобы убрать: ${it.n}${back ? ` (вернётся ${fmt(back)} 🪙)` : ''}`);
+    setTimeout(() => { if (pendingRemove === i) pendingRemove = null; }, 3000);
+    return;
+  }
+  pendingRemove = null;
+  S.money += back; hudDirty = true; clearPlot(p);
+  const c = plotCenter(i); burst(c.x, c.y, ['💨', '🍂'], 6); sfx('whack');
+}
+
+/* =====================================================================
+   ВРЕДИТЕЛИ, ПОГОДА, ПОТЕРИ
+   ===================================================================== */
+function spawnPest() {
+  let total = 0;
+  S.areas.forEach(a => a.plots.forEach(p => { if (p.pest) total++; }));
+  if (total >= 2 + Math.floor(S.level / 6)) return;
+  const open = S.areas.map((a, i) => i).filter(i => S.areas[i].unlocked);
+  const ai = Math.random() < 0.65 ? S.areaIdx : pick(open);
+  const a = S.areas[ai], d = AREAS[ai];
+  const cand = a.plots.map((p, i) => i).filter(i => { const p = a.plots[i]; return p.item && !p.pest && (p.st === 'grow' || p.n > 0); });
+  if (!cand.length) return;
+  const table = PEST_TABLE[d.indoor ? 'indoor' : d.kind];
+  let r = Math.random() * 100, type = table[0][0];
+  for (const [t, w] of table) { if (r < w) { type = t; break; } r -= w; }
+  if (S.level < 3 && type !== 'bug') type = 'bug';
+  const def = PESTS[type], hp = rint(def.hp[0], def.hp[1]);
+  a.plots[pick(cand)].pest = { type, hp, t: def.t, total: def.t };
+  if (ai === S.areaIdx) sfx('pest');
+}
+function whack(ai, i, manual) {
+  const p = S.areas[ai].plots[i];
+  if (!p.pest) return;
+  p.pest.hp--;
+  const here = ai === S.areaIdx, c = here ? plotCenter(i) : null;
+  if (here) { burst(c.x, c.y, ['💥'], 1); if (manual) { sfx('whack'); vib(12); } }
+  if (p.pest.hp <= 0) {
+    const gain = prize(manual ? 3 : 1.5);
+    p.pest = null; S.stats.pests++; addMoney(gain); addXp(1);
+    if (here) { floatText(c.x, c.y, `+${short(gain)}`, ''); coinsFly(c.x, c.y, 2); }
+  }
+}
+// урожай пропал (съели или сожгла молния)
+function loseCrop(ai, i, cause) {
+  const p = S.areas[ai].plots[i], it = ITEM[p.item];
+  if (!it) return;
+  const value = it.sell * Math.max(1, p.n);
+  if (it.k === 'veg') clearPlot(p);
+  else { p.n = 0; p.gold = false; p.pest = null; p.st = 'grow'; p.t = p.total = it.t; }
+  if (S.boosts.insure > 0) { addMoney(value); toast(`🛡️ Страховка вернула ${fmt(value)} 🪙`); }
+  else if (cause === 'pest') toast(`😱 Вредитель съел урожай: ${it.n}`);
+  if (ai === S.areaIdx && cause === 'pest') { const f = $('field'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); sfx('err'); }
+}
+function pickWeather(prev) {
+  if (prev === 'rain' && Math.random() < 0.3) return 'rainbow';
+  const opts = [['sun', 42], ['rain', 26]];
+  if (S.level >= 3) opts.push(['heat', 16]);
+  if (S.level >= 4) opts.push(['storm', 16]);
+  const list = opts.filter(o => o[0] !== prev);
+  if (prev !== 'sun' && S.level < 3) return 'sun';
+  let r = Math.random() * list.reduce((s, o) => s + o[1], 0);
+  for (const [w, wt] of list) { if (r < wt) return w; r -= wt; }
+  return 'sun';
+}
+function nextWeather() {
+  const w = S.weather;
+  w.cur = WX[w.next] ? w.next : 'sun';
+  w.left = rnd(WX[w.cur].dur[0], WX[w.cur].dur[1]);
+  w.next = pickWeather(w.cur);
+  w.strikes = [];
+  if (w.cur === 'storm') {
+    const k = rint(2, 3);
+    for (let j = 0; j < k; j++) w.strikes.push(rnd(4, w.left - 4));
+    w.strikes.sort((x, y) => x - y);                        // бьём, когда left опустится ниже последнего
+    toast(S.up.rod ? '⛈️ Гроза! Громоотвод защитит урожай ⚡' : '⛈️ Гроза! Собирай спелое — молния может ударить!');
+    sfx('thunder');
+  } else if (w.cur === 'rainbow') toast('🌈 Радуга! Золотой урожай выпадает втрое чаще');
+  else if (w.cur === 'heat') toast('🥵 Жара! Поливай грядки, чтобы росли быстрее');
+  else if (w.cur === 'rain') toast('🌧️ Дождик! Всё растёт вдвое быстрее');
+  renderWeather();
+}
+function lightning() {
+  sfx('thunder'); vib([40, 60, 80]);
+  const layer = $('wxLayer'); layer.classList.remove('flash'); void layer.offsetWidth; layer.classList.add('flash');
+  if (S.up.rod) return;
+  const spots = [];
+  S.areas.forEach((a, ai) => {
+    if (!a.unlocked || AREAS[ai].indoor) return;
+    a.plots.forEach((p, i) => { if (p.item && (p.st === 'grow' || p.n > 0)) spots.push([ai, i]); });
+  });
+  if (!spots.length) return;
+  const here = spots.filter(s => s[0] === S.areaIdx);
+  const [ai, i] = here.length && Math.random() < 0.7 ? pick(here) : pick(spots);
+  const it = ITEM[S.areas[ai].plots[i].item];
+  loseCrop(ai, i, 'storm');
+  burns[ai + ':' + i] = 2.5;
+  if (ai === S.areaIdx) {
+    const c = plotCenter(i); burst(c.x, c.y, ['⚡', '🔥', '💨'], 8);
+    const f = $('field'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake');
+  }
+  if (!(S.boosts.insure > 0)) toast(`⚡ Молния сожгла: ${it.n}${ai !== S.areaIdx ? ' (' + AREAS[ai].name + ')' : ''}`);
+}
+
+/* =====================================================================
+   ЗАКАЗЫ, ТОВАР ДНЯ, ПОДАРКИ
+   ===================================================================== */
+function sellablePool() {
+  const veg = ITEMS.filter(it => it.k === 'veg' && it.lvl <= S.level).slice(-5);
+  const owned = {};
+  S.areas.forEach(a => a.plots.forEach(p => { if (p.item && ITEM[p.item].k !== 'veg') owned[p.item] = 1; }));
+  return veg.concat(Object.keys(owned).map(id => ITEM[id]));
+}
+function makeOrder() {
+  const pool = sellablePool().sort(() => Math.random() - 0.5);
+  const cnt = S.level < 3 ? 1 : Math.min(pool.length, rint(1, 2));
+  let coins = 0, xp = 0;
+  const need = pool.slice(0, cnt).map(it => {
+    // сколько грядок под такую культуру есть у игрока — от этого размер заказа
+    let plots = 0;
+    S.areas.forEach((a, ai) => { if (a.unlocked && AREAS[ai].kind === it.k) plots += a.plots.filter(p => it.k === 'veg' ? p.st !== 'wild' : p.item === it.id).length; });
+    const qty = clamp(Math.round(rnd(160, 340) / cnt / it.t * clamp(plots / 6, 0.6, 2.2)), 2, 24);
+    coins += qty * it.sell; xp += qty * itemXp(it);
+    return { item: it.id, qty, got: 0 };
+  });
+  return { who: rint(0, CUSTOMERS.length - 1), need, coins: nice(coins * 1.2), xp: Math.round(xp * 1.5) + 4 };
+}
+const orderDone = o => o && o.need && o.need.every(q => q.got >= q.qty);
+function claimOrder(k) {
+  const o = S.orders[k];
+  if (!orderDone(o)) return;
+  addMoney(o.coins); S.stats.orders++;
+  S.orders[k] = { wait: 20 };
+  const r = $('ordersRow').children[k].getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+  floatText(x, y + 26, `+${short(o.coins)} 🪙`, 'gold'); floatText(x, y + 48, `+${o.xp} ⭐`, 'xp');
+  coinsFly(x, y, 8); sfx('gold'); vib([10, 30, 10]);
+  toast(`${CUSTOMERS[o.who][0]} ${CUSTOMERS[o.who][1]}: «Спасибо!»`);
+  addXp(o.xp); renderOrders();
+  if (sheetName === 'orders') openSheet('orders');
+}
+function newHot() {
+  if (S.level < 3) { S.hot.item = null; S.hot.left = 30; return; }   // пока культур мало — товара дня нет
+  const pool = sellablePool().filter(it => it.id !== S.hot.item);
+  S.hot.item = pool.length ? pick(pool).id : ITEMS[0].id;
+  S.hot.left = 240;
+  if (S.tut >= 4) toast(`🔥 Товар дня: ${ITEM[S.hot.item].e} — продаётся вдвое дороже!`);
+  renderSeeds();
+}
+function spawnGift() {
+  if ($('fieldBox').querySelector('.gift') || sheetName || modalOpen) return;
+  const g = document.createElement('div');
+  g.className = 'gift'; g.style.top = rint(5, 55) + '%';
+  g.innerHTML = '<span>🎈<small>🎁</small></span>';
+  g.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); const r = g.getBoundingClientRect(); g.remove(); openGift(r.left + r.width / 2, r.top + r.height / 2); });
+  g.addEventListener('animationend', e => { if (e.animationName === 'fly') g.remove(); });
+  $('fieldBox').appendChild(g);
+}
+function openGift(x, y) {
+  S.stats.gifts++;
+  burst(x, y, ['🎉', '✨', '🎊'], 10); sfx('gold'); vib([10, 30, 10]);
+  const r = Math.random();
+  if (r < 0.45) { const c = prize(rnd(25, 50)); addMoney(c); floatText(x, y, `+${short(c)} 🪙`, 'gold'); coinsFly(x, y, 8); toast(`🎁 В шарике монеты: +${fmt(c)} 🪙`); }
+  else if (r < 0.55) { const c = prize(180); addMoney(c); floatText(x, y, `+${short(c)} 🪙`, 'gold'); coinsFly(x, y, 14); confetti(); toast(`🎁 ДЖЕКПОТ! +${fmt(c)} 🪙`); }
+  else if (r < 0.70) { S.water = waterCap(); const xp = Math.round(xpNeed(S.level) * 0.08) + 3; addXp(xp); floatText(x, y, `+${xp} ⭐`, 'xp'); toast('🎁 Полный колодец 💧 и опыт ⭐'); }
+  else {
+    const b = pick(BOOSTS.filter(b => b.id !== 'insure'));
+    S.boosts[b.id] += 60;
+    toast(`🎁 Подарок: ${b.ic} ${b.name} на 1 минуту!`);
+  }
+  hudDirty = true;
+}
+
+/* =====================================================================
+   ПОКУПКИ В МЕНЮ
+   ===================================================================== */
+function buyBoost(id) {
+  const b = BOOST[id];
+  if (S.level < b.lvl) return;
+  const dur = b.dur * teamMult();
+  if (S.boosts[id] > dur * 2) { toast('Уже запасено надолго 👍'); return; }
+  const price = boostPrice(b);
+  if (!spend(price)) { toast('Не хватает монет 🪙'); sfx('err'); return; }
+  S.boosts[id] += dur; sfx('buy');
+  toast(`${b.ic} ${b.name}: +${fmtT(dur)}`);
+}
+function buyUpgrade(id) {
+  const u = UPG[id], l = S.up[id];
+  if (l >= u.cost.length || (u.lvl && S.level < u.lvl)) return;
+  if (!spend(u.cost[l])) { toast('Не хватает монет 🪙'); sfx('err'); return; }
+  S.up[id]++; sfx('level'); confetti(18);
+  if (id === 'well') S.water = waterCap();
+  if (id === 'palace') queueModal(`<div class="big">🏰👑</div><h2>Дворец построен!</h2><p>Ты — <b>лучший фермер на свете</b>! Теперь весь урожай продаётся в 1,5 раза дороже. Ферма продолжает расти — играй сколько хочешь!</p><div class="btns"><button class="buy" data-close>Ура-а-а!</button></div>`, () => confetti(80));
+  else toast(`${u.ic} ${u.name} улучшен!`);
+}
+function buyArea(ai) {
+  const d = AREAS[ai];
+  if (S.level < d.lvl || S.areas[ai].unlocked) return;
+  if (!spend(d.price)) { toast(`Нужно ${fmt(d.price)} 🪙`); sfx('err'); return; }
+  openArea(S, ai); S.areaIdx = ai; tool = 'hand';
+  sfx('level'); confetti(40);
+  renderAll(); save();
+}
+function checkAchievements() {
+  ACHS.forEach(a => {
+    if (S.ach[a.id]) return;
+    const v = typeof a.st === 'function' ? a.st(S) : S.stats[a.st];
+    if (v >= a.goal) {
+      S.ach[a.id] = 1; addMoney(a.coins);
+      toast(`🏆 Награда «${a.name}»: +${fmt(a.coins)} 🪙`); sfx('gold');
+    }
+  });
+}
+
+/* =====================================================================
+   ГЛАВНЫЙ ЦИКЛ
+   ===================================================================== */
+function tick(dt) {
+  // погода
+  const w = S.weather;
+  w.left -= dt;
+  if (w.cur === 'storm' && w.strikes.length && w.left <= w.strikes[w.strikes.length - 1]) { w.strikes.pop(); lightning(); }
+  if (w.left <= 0) nextWeather();
+  // товар дня
+  S.hot.left -= dt;
+  if (S.hot.left <= 0) newHot();
+  // помощники
+  for (const k in S.boosts) {
+    if (S.boosts[k] > 0) { S.boosts[k] -= dt; if (S.boosts[k] <= 0) { S.boosts[k] = 0; toast(`${BOOST[k].ic} ${BOOST[k].name}: время вышло`); } }
+  }
+  // колодец
+  if (S.water < waterCap()) { const b = Math.floor(S.water); S.water = Math.min(waterCap(), S.water + dt / waterRegen()); if (Math.floor(S.water) !== b) hudDirty = true; }
+  // заказы
+  S.orders.forEach((o, k) => { if (!o) S.orders[k] = makeOrder(); else if (o.wait !== undefined) { o.wait -= dt; if (o.wait <= 0) { S.orders[k] = makeOrder(); if (S.tut >= 4) sfx('pop'); } } });
+  // грядки
+  S.areas.forEach((a, ai) => {
+    if (!a.unlocked) return;
+    a.plots.forEach((p, i) => {
+      if (p.wet > 0) p.wet = Math.max(0, p.wet - dt);
+      if (p.pest) { p.pest.t -= dt; if (p.pest.t <= 0) { p.pest = null; loseCrop(ai, i, 'pest'); } }
+      if (p.st === 'grow' && p.item) { p.t -= dt * speedOf(ai, p); if (p.t <= 0) { ripen(p); if (ai === S.areaIdx && S.tut < 4) sfx('pop'); } }
+    });
+  });
+  for (const k in burns) { burns[k] -= dt; if (burns[k] <= 0) delete burns[k]; }
+  // вредители (со 2 уровня)
+  if (S.level >= 2) {
+    pestClock += dt * (S.boosts.manure > 0 ? 2 : 1);
+    if (pestClock >= 9) { pestClock = 0; if (Math.random() < 0.4) spawnPest(); }
+  }
+  // пёс
+  if (S.boosts.dog > 0) { dogClock += dt; if (dogClock >= 1.3) { dogClock = 0; dogAct(); } }
+  // работник
+  if (S.boosts.worker > 0) { workerClock += dt; if (workerClock >= 1.2 / teamMult()) { workerClock = 0; workerAct(); } }
+  // комбо
+  if (comboLeft > 0) { comboLeft -= dt; if (comboLeft <= 0) combo = 0; }
+  // шарик с подарком
+  if (S.level >= 2) { giftClock -= dt; if (giftClock <= 0) { giftClock = rnd(75, 130); spawnGift(); } }
+  // подсказка «заказы» держится недолго
+  if (S.tut === 4) { tutClock += dt; if (tutClock > 9) S.tut = 5; }
+  tipClock += dt; if (tipClock > 14) { tipClock = 0; tipIdx = (tipIdx + 1) % TIPS.length; }
+  saveClock += dt; if (saveClock > 5) { saveClock = 0; checkAchievements(); save(); }
+}
+let tutClock = 0;
+
+function areaOrder() { const o = [S.areaIdx]; S.areas.forEach((a, i) => { if (i !== S.areaIdx && a.unlocked) o.push(i); }); return o; }
+function dogAct() {
+  for (const ai of areaOrder()) {
+    const i = S.areas[ai].plots.findIndex(p => p.pest);
+    if (i >= 0) { S.areas[ai].plots[i].pest.hp = 1; whack(ai, i, false); moveSprite($('dogSpr'), ai, i); if (ai === S.areaIdx) sfx('bark'); return; }
+  }
+}
+function workerAct() {
+  for (const ai of areaOrder()) {
+    const i = S.areas[ai].plots.findIndex(p => p.n > 0 && !p.pest);
+    if (i >= 0) { harvest(ai, i, false); moveSprite($('workerSpr'), ai, i); return; }
+  }
+  for (const ai of areaOrder()) {
+    if (AREAS[ai].kind !== 'veg') continue;
+    const a = S.areas[ai], it = ITEM[a.sel];
+    if (!it || S.money < it.cost) continue;
+    const i = a.plots.findIndex(p => p.st === 'empty');
+    if (i >= 0 && plant(ai, i, false)) { moveSprite($('workerSpr'), ai, i); return; }
+  }
+}
+
+// игра была закрыта или свёрнута: растения росли, вредители и погода — нет
+function fastForward(sec) {
+  sec = Math.min(sec, 12 * 3600);
+  let ripe = 0;
+  S.areas.forEach((a, ai) => {
+    if (!a.unlocked) return;
+    const d = AREAS[ai], sp = (d.speed || 1) * (1 + 0.1 * S.up.sprink);
+    a.plots.forEach(p => {
+      p.pest = null; p.wet = 0;
+      if (p.st !== 'grow' || !p.item) return;
+      p.t -= sec * sp;
+      while (p.st === 'grow' && p.t <= 0) { ripen(p); ripe++; }
+    });
+  });
+  S.water = Math.min(waterCap(), S.water + sec / waterRegen());
+  S.orders.forEach(o => { if (o && o.wait !== undefined) o.wait -= sec; });
+  S.hot.left -= sec;
+  if (sec > S.weather.left) S.weather = { cur: 'sun', left: rnd(60, 120), next: pickWeather('sun'), strikes: [] };
+  else S.weather.left -= sec;
+  combo = 0; comboLeft = 0;
+  return ripe;
+}
+
+/* =====================================================================
+   ФОРМАТЫ ЧИСЕЛ И ВРЕМЕНИ
+   ===================================================================== */
+function fmt(n) {
+  n = Math.floor(n);
+  if (n < 1e6) return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  if (n < 1e9) return (n / 1e6).toFixed(n < 1e7 ? 2 : 1).replace('.', ',') + ' млн';
+  return (n / 1e9).toFixed(2).replace('.', ',') + ' млрд';
+}
+function short(n) {
+  n = Math.round(n);
+  if (n < 1000) return String(n);
+  if (n < 1e6) return (n / 1e3).toFixed(n < 1e4 ? 1 : 0).replace(/\.0$/, '').replace('.', ',') + 'к';
+  return (n / 1e6).toFixed(n < 1e7 ? 1 : 0).replace(/\.0$/, '').replace('.', ',') + 'м';
+}
+function fmtT(s) {
+  s = Math.max(0, Math.ceil(s));
+  if (s < 60) return s + 'с';
+  const m = Math.floor(s / 60), r = s % 60;
+  if (m < 60) return m + ':' + (r < 10 ? '0' : '') + r;
+  return Math.floor(m / 60) + 'ч ' + (m % 60) + 'м';
+}
+
+/* =====================================================================
+   ЗВУК (синтезатор — без файлов) И ВИБРАЦИЯ
+   ===================================================================== */
+let AC = null;
+function audio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f, d, type, vol, f2, delay) {
+  const c = audio(); if (!c) return;
+  const t = c.currentTime + (delay || 0), o = c.createOscillator(), g = c.createGain();
+  o.type = type || 'sine'; o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+  g.gain.setValueAtTime(vol || 0.1, t); g.gain.exponentialRampToValueAtTime(0.001, t + d);
+  o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + d + 0.03);
+}
+function noise(d, vol, freq) {
+  const c = audio(); if (!c) return;
+  const len = Math.floor(c.sampleRate * d), buf = c.createBuffer(1, len, c.sampleRate), data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = c.createBufferSource(), flt = c.createBiquadFilter(), g = c.createGain();
+  src.buffer = buf; flt.type = 'lowpass'; flt.frequency.value = freq; g.gain.value = vol;
+  src.connect(flt); flt.connect(g); g.connect(c.destination); src.start();
+}
+function sfx(name, arg) {
+  if (!S || !S.sound) return;
+  switch (name) {
+    case 'plant':   tone(280, 0.09, 'triangle', 0.10, 430); break;
+    case 'harvest': { const k = 1 + Math.min(arg || 1, 11) * 0.06; tone(500 * k, 0.1, 'triangle', 0.12, 900 * k); break; }
+    case 'water':   tone(950, 0.14, 'sine', 0.07, 380); break;
+    case 'whack':   noise(0.09, 0.3, 1400); tone(170, 0.1, 'square', 0.06, 70); break;
+    case 'buy':     tone(390, 0.08, 'triangle', 0.1); tone(590, 0.12, 'triangle', 0.1, null, 0.07); break;
+    case 'pop':     tone(700, 0.06, 'sine', 0.06, 1000); break;
+    case 'pest':    tone(240, 0.12, 'sawtooth', 0.04, 200); tone(240, 0.12, 'sawtooth', 0.04, 200, 0.16); break;
+    case 'bark':    tone(330, 0.07, 'square', 0.05, 220); break;
+    case 'err':     tone(190, 0.14, 'sawtooth', 0.05, 120); break;
+    case 'gold':    [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.14, 'triangle', 0.09, null, i * 0.06)); break;
+    case 'level':   [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, 0.16, 'triangle', 0.1, null, i * 0.09)); break;
+    case 'thunder': noise(1.3, 0.55, 260); break;
+    case 'click':   tone(600, 0.04, 'sine', 0.05); break;
+  }
+}
+function vib(p) { if (S && S.sound && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) { /* не страшно */ } } }
+
+// фоновая музыка — те же файлы, что и в прошлых версиях фермы
+const PLAYLIST = ['music1.mp3', 'music2.mp3', 'music3.mp3', 'music4.mp3'];
+let track = 0;
+let wantMusic = false;     // музыка была включена в прошлый раз — запустим после первого касания
+function musicUI() { const b = $('musBtn'); b.classList.toggle('on', S.music); b.textContent = S.music ? '🎵' : '🔇'; }
+function setMusic(on) {
+  const m = $('bgMusic');
+  S.music = on; wantMusic = false; musicUI();
+  if (!on) { m.pause(); return; }
+  if (!m.getAttribute('src')) m.src = PLAYLIST[track];
+  m.volume = 0.5;
+  m.play().then(cacheMusic, () => {
+    S.music = false; musicUI();
+    toast('🎵 Музыка не загрузилась. В первый раз ей нужен интернет');
+    if (sheetName === 'menu') openSheet('menu');
+  });
+}
+// складываем треки в память телефона, чтобы потом музыка играла и без интернета
+function cacheMusic() {
+  if (!('caches' in window) || location.protocol.indexOf('http') !== 0) return;
+  caches.open('ferma-music-v1').then(c => PLAYLIST.forEach(f => c.match(f).then(hit => { if (!hit) c.add(f).catch(() => {}); }))).catch(() => {});
+}
+
+/* =====================================================================
+   ЭФФЕКТЫ
+   ===================================================================== */
+const plotEls = [];
+function plotCenter(i) { const r = plotEls[i].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+function fxAdd(cls, html, x, y) {
+  const fx = $('fx');
+  if (fx.childElementCount > 90) return null;
+  const el = document.createElement('div');
+  el.className = cls; el.innerHTML = html; el.style.left = x + 'px'; el.style.top = y + 'px';
+  fx.appendChild(el); return el;
+}
+function floatText(x, y, text, cls) {
+  const el = fxAdd('ft ' + (cls || ''), text, x, y); if (!el) return;
+  el.animate([{ transform: 'translate(-50%,-50%) scale(.6)', opacity: 0 }, { transform: 'translate(-50%,-110%) scale(1.15)', opacity: 1, offset: 0.2 }, { transform: 'translate(-50%,-260%) scale(1)', opacity: 0 }],
+    { duration: 1000, easing: 'ease-out' }).onfinish = () => el.remove();
+}
+function burst(x, y, emojis, count) {
+  for (let k = 0; k < count; k++) {
+    const el = fxAdd('pt', pick(emojis), x, y); if (!el) return;
+    const a = Math.random() * Math.PI * 2, d = rnd(24, 60);
+    el.animate([{ transform: 'translate(-50%,-50%) scale(.4)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d - 14}px)) scale(1.1)`, opacity: 0 }],
+      { duration: rnd(450, 750), easing: 'ease-out' }).onfinish = () => el.remove();
+  }
+}
+function coinsFly(x, y, count, emoji) {
+  const t = $('coinBox').getBoundingClientRect(), tx = t.left + 16, ty = t.top + t.height / 2;
+  for (let k = 0; k < count; k++) {
+    const el = fxAdd('pt', k === 0 && emoji ? emoji : '🪙', x, y); if (!el) return;
+    const mx = x + rnd(-40, 40), my = y - rnd(20, 60);
+    el.animate([{ transform: 'translate(-50%,-50%) scale(.5)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${mx - x}px), calc(-50% + ${my - y}px)) scale(1.1)`, opacity: 1, offset: 0.3 },
+      { transform: `translate(calc(-50% + ${tx - x}px), calc(-50% + ${ty - y}px)) scale(.6)`, opacity: 0.9 }],
+      { duration: 650 + k * 70, easing: 'ease-in' }).onfinish = () => { el.remove(); if (k === 0) bump($('coinBox')); };
+  }
+}
+function confetti(count) {
+  const colors = ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93', '#ff924c'], w = window.innerWidth, h = window.innerHeight;
+  for (let k = 0; k < (count || 45); k++) {
+    const el = document.createElement('div');
+    el.className = 'cf'; el.style.left = rnd(0, w) + 'px'; el.style.background = pick(colors);
+    $('fx').appendChild(el);
+    el.animate([{ transform: 'translateY(0) rotate(0)' }, { transform: `translate(${rnd(-80, 80)}px, ${h + 40}px) rotate(${rnd(360, 1080)}deg)` }],
+      { duration: rnd(1400, 2600), delay: rnd(0, 400), easing: 'cubic-bezier(.3,.6,.6,1)' }).onfinish = () => el.remove();
+  }
+}
+function parkSprites() { $('workerSpr').style.transform = 'translate(8px,-22px)'; $('dogSpr').style.transform = 'translate(46px,-22px)'; }
+function bump(el) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+function moveSprite(el, ai, i) {
+  if (ai !== S.areaIdx) return;
+  const box = $('fieldBox').getBoundingClientRect(), r = plotEls[i].getBoundingClientRect();
+  el.style.transform = `translate(${r.left - box.left + r.width / 2 - 15}px, ${r.top - box.top + r.height / 2 - 26}px)`;
+  el.classList.remove('hop'); void el.offsetWidth; el.classList.add('hop');
+}
+const lastToast = {};
+function toast(text) {
+  const now = Date.now();
+  if (lastToast[text] && now - lastToast[text] < 2500) return;
+  lastToast[text] = now;
+  const box = $('toasts');
+  while (box.childElementCount >= 3) box.firstChild.remove();
+  const el = document.createElement('div');
+  el.className = 'toast'; el.innerHTML = text;
+  el.addEventListener('animationend', () => el.remove());
+  box.appendChild(el);
+}
+
+/* =====================================================================
+   ОТРИСОВКА
+   ===================================================================== */
+let hudDirty = true;
+function setText(el, t) { if (el._t !== t) { el._t = t; el.textContent = t; } }
+function setHTML(el, h) { if (el._h !== h) { el._h = h; el.innerHTML = h; } }
+
+function renderHud() {
+  setText($('lvlNum'), String(S.level));
+  const need = xpNeed(S.level);
+  $('xpFill').style.width = clamp(S.xp / need * 100, 0, 100) + '%';
+  setText($('xpTxt'), need < 1000 ? `${Math.floor(S.xp)} / ${need}` : `${short(S.xp)} / ${short(need)}`);
+  setText($('moneyTxt'), fmt(S.money));
+  setText($('waterTxt'), `${Math.floor(S.water)}/${waterCap()}`);
+  hudDirty = false;
+}
+function renderWeather() {
+  const w = S.weather, d = WX[w.cur], chip = $('wxChip');
+  chip.className = 'chip wx ' + w.cur;
+  setHTML(chip, `${d.ic} ${d.name} · ${fmtT(w.left)} <span style="opacity:.65">→ потом ${WX[w.next].ic}</span>`);
+  const layer = $('wxLayer'), want = curDef().indoor ? '' : w.cur;
+  if (layer._w !== want) { layer._w = want; layer.className = 'wx-layer ' + want; }
+  const it = ITEM[S.hot.item];
+  $('hotChip').style.display = it ? '' : 'none';
+  setHTML($('hotChip'), it ? `🔥 ${it.e} ×2 · ${fmtT(S.hot.left)}` : '');
+}
+function renderOrders() {
+  const row = $('ordersRow');
+  if (!row.childElementCount) for (let k = 0; k < 3; k++) { const b = document.createElement('button'); b.dataset.order = k; row.appendChild(b); }
+  let ready = 0;
+  S.orders.forEach((o, k) => {
+    const el = row.children[k];
+    let cls, h;
+    if (!o || o.wait !== undefined) { cls = 'ord wait'; h = `⏳ ${o ? fmtT(o.wait) : ''}`; }
+    else {
+      const done = orderDone(o); if (done) ready++;
+      const need = o.need.map(q => `${ITEM[q.item].e}${q.got}/${q.qty}`).join(' ');
+      cls = 'ord' + (done ? ' done' : '');
+      h = `<span class="who">${CUSTOMERS[o.who][0]}</span><span class="tx"><span class="need">${done ? '✅ Сдать!' : need}</span><span class="rw">+${short(o.coins)}🪙 +${o.xp}⭐</span></span>`;
+    }
+    if (el._cls !== cls) { el._cls = cls; el.className = cls; }
+    setHTML(el, h);
+  });
+  const dot = $('dotOrders'); dot.classList.toggle('on', ready > 0); setText(dot, String(ready));
+}
+function renderTabs() {
+  const row = $('areaTabs');
+  if (!row.childElementCount) AREAS.forEach((d, ai) => { const b = document.createElement('button'); b.dataset.area = ai; row.appendChild(b); });
+  AREAS.forEach((d, ai) => {
+    const a = S.areas[ai], el = row.children[ai];
+    let cls, h;
+    if (a.unlocked) {
+      let ready = 0, pests = 0;
+      a.plots.forEach(p => { if (p.n > 0) ready++; if (p.pest) pests++; });
+      cls = ai === S.areaIdx ? 'on' : '';
+      h = `${d.icon} ${d.name}` + (ready && ai !== S.areaIdx ? `<i class="dot">${ready}</i>` : '') + (pests && ai !== S.areaIdx ? `<i class="dot pest">!</i>` : '');
+    } else if (S.level >= d.lvl) { cls = 'lock buyable'; h = `🔓 ${d.name}`; }
+    else { cls = 'lock'; h = `🔒 ур.${d.lvl}`; }
+    if (el._cls !== cls) { el._cls = cls; el.className = cls; }
+    setHTML(el, h);
+  });
+}
+function renderBoosts() {
+  let h = '';
+  BOOSTS.forEach(b => { const t = S.boosts[b.id]; if (t > 0) h += `<span class="bb${t < 15 ? ' low' : ''}">${b.ic} ${fmtT(t)}</span>`; });
+  if (!h) h = `<span class="tip">${TIPS[tipIdx]}</span>`;
+  setHTML($('boostRow'), h);
+  $('workerSpr').classList.toggle('on', S.boosts.worker > 0);
+  $('dogSpr').classList.toggle('on', S.boosts.dog > 0);
+}
+function renderSeeds() {
+  const a = curArea(), d = curDef();
+  let h = `<button class="seed tool${tool === 'remove' ? ' sel' : ''}" data-tool="remove"><span class="e">🪓</span><span class="n">Убрать</span></button>`;
+  let teased = 0;
+  ITEMS.filter(it => it.k === d.kind).forEach(it => {
+    if (it.lvl > S.level) {
+      if (teased++ < 2) h += `<button class="seed lock" data-locked="${it.lvl}"><span class="e">${it.k === 'animal' ? it.body : it.e}</span><span class="n">${it.n}</span><span class="c">🔒 ур. ${it.lvl}</span></button>`;
+      return;
+    }
+    const sel = tool === 'hand' && a.sel === it.id, hot = S.hot.item === it.id;
+    const line = it.k === 'veg' ? `${short(it.cost)}🪙→<u>${short(it.sell)}</u>` : `${short(it.cost)}🪙`;
+    const sub = it.k === 'veg' ? `⏱ ${fmtT(it.t)}` : `${it.e}<u>${short(it.sell)}</u>/${fmtT(it.t)}`;
+    h += `<button class="seed${sel ? ' sel' : ''}" data-seed="${it.id}" data-cost="${it.cost}"><span class="e">${it.k === 'animal' ? it.body : it.e}</span><span class="n">${it.n}</span><span class="c">${line}</span><span class="c" style="color:#6b5a3a">${sub}</span>${hot ? '<span class="hotf">🔥</span>' : ''}</button>`;
+  });
+  const strip = $('seedStrip');
+  strip.innerHTML = h;
+  const s = strip.querySelector('.seed.sel:not(.tool)');
+  if (s && s.scrollIntoView) { const l = s.offsetLeft - strip.clientWidth / 2 + s.offsetWidth / 2; strip.scrollLeft = Math.max(0, l); }
+  markAffordable();
+}
+function markAffordable() {
+  document.querySelectorAll('[data-cost]').forEach(el => el.classList.toggle('cant', S.money < +el.dataset.cost));
+}
+
+// одна грядка -> классы и разметка
+function plotView(ai, i) {
+  const a = S.areas[ai], p = a.plots[i];
+  let cls = 'plot', h = '';
+  if (p.st === 'wild') {
+    const price = plotPrice(ai);
+    cls += ' wild' + (S.money >= price ? ' can' : '');
+    h = `<span class="em">${p.deco}</span><span class="tag price">${short(price)}🪙</span>`;
+  } else if (p.st === 'empty') {
+    cls += ' soil';
+    const it = ITEM[a.sel];
+    if (tool === 'hand' && it && it.lvl <= S.level) h = `<span class="em ghost">${it.k === 'veg' ? it.e : it.body}</span>`;
+  } else {
+    const it = ITEM[p.item], prog = p.total > 0 ? 1 - p.t / p.total : 1;
+    cls += ' soil';
+    if (tool === 'remove') cls += ' rm';
+    if (p.n > 0) cls += p.gold ? ' ready gold' : ' ready';
+    if (it.k === 'veg') {
+      if (p.st === 'ready') h = `<span class="em ripe">${it.e}</span>`;
+      else if (prog < 0.34) h = '<span class="em s0">🌱</span>';
+      else if (prog < 0.72) h = '<span class="em s1">🌿</span>';
+      else h = `<span class="em s2">${it.e}</span>`;
+    } else if (it.k === 'tree') {
+      if (!p.mature) h = prog < 0.4 ? '<span class="em s0">🌱</span>' : prog < 0.8 ? '<span class="em s1">🌿</span>' : `<span class="em s2">${it.body}</span>`;
+      else h = `<span class="em tree">${it.body}</span>`;
+    } else h = `<span class="em animal">${it.body}</span>`;
+    if (it.k !== 'veg' && p.n > 0) h += `<span class="badge">${it.e}${p.n > 1 ? `<small>${p.n}</small>` : ''}</span>`;
+    if (p.gold && p.n > 0) h += '<span class="spark">✨</span>';
+    if (p.st === 'grow') h += '<i class="bar"><b></b></i><span class="tag time"></span>';
+    if (p.wet > 0) { cls += ' wet'; h += '<span class="drop">💧</span>'; }
+  }
+  if (p.pest) h += `<span class="pest">${PESTS[p.pest.type].e}${p.pest.hp > 1 ? `<small>${p.pest.hp}</small>` : ''}<i><b></b></i></span>`;
+  if (burns[ai + ':' + i]) h += '<span class="burn">🔥</span>';
+  return [cls, h];
+}
+function renderField() {
+  const ai = S.areaIdx, a = S.areas[ai];
+  for (let i = 0; i < 20; i++) {
+    const el = plotEls[i], p = a.plots[i], [cls, h] = plotView(ai, i);
+    if (el._cls !== cls) { el._cls = cls; el.className = cls; }
+    if (el._h !== h) {
+      el._h = h; el.innerHTML = h;
+      el._bar = el.querySelector('.bar b'); el._time = el.querySelector('.tag.time'); el._pest = el.querySelector('.pest i b');
+    }
+    if (p.st === 'grow' && el._bar) {
+      el._bar.style.width = clamp((1 - p.t / p.total) * 100, 0, 100) + '%';
+      const sp = speedOf(ai, p);
+      setText(el._time, sp > 0 ? fmtT(p.t / sp) : '⏸');
+    }
+    if (p.pest && el._pest) el._pest.style.width = clamp(p.pest.t / p.pest.total * 100, 0, 100) + '%';
+  }
+}
+function renderCombo() {
+  const el = $('comboBox');
+  if (combo >= 2) { setText(el, `🔥 Комбо ×${combo}  +${Math.min(combo - 1, 10) * 5}%`); el.classList.add('on'); }
+  else el.classList.remove('on');
+}
+function renderHint() {
+  const el = $('hintBox'); let t = '';
+  if (S.tut === 0) t = '👆 Тапни по грядке — посади морковку!';
+  else if (S.tut === 1) t = curArea().plots.some(p => p.n > 0) ? '🥕 Созрело! Тапни, чтобы собрать' : '💧 Тапни по ростку — полей его, вырастет вдвое быстрее';
+  else if (S.tut === 2) t = curArea().plots.some(p => p.n > 0) ? '🥕 Созрело! Тапни, чтобы собрать' : (curArea().plots.some(p => p.st === 'grow') ? '⏳ Подожди, скоро созреет…' : '👆 Посади ещё морковку');
+  else if (S.tut === 3) t = S.money >= plotPrice(0) ? '🌿 Тапни по зелёному участку — купи новую грядку!' : '🪙 Сажай и собирай — копи на новую грядку';
+  else if (S.tut === 4) t = '📋 Выполняй заказы сверху — за них дают монеты и опыт ⭐';
+  if (t) { setText(el, t); el.classList.add('on'); } else el.classList.remove('on');
+}
+function renderAll() {
+  musicUI();
+  $('field').classList.toggle('indoor', !!curDef().indoor);
+  renderHud(); renderWeather(); renderOrders(); renderTabs(); renderBoosts(); renderSeeds(); renderField(); renderCombo(); renderHint();
+}
+function renderFrame() {
+  if (hudDirty) { renderHud(); markAffordable(); refreshDots(); }
+  renderWeather(); renderOrders(); renderTabs(); renderBoosts(); renderField(); renderCombo(); renderHint();
+  if (sheetName === 'shop') document.querySelectorAll('[data-left]').forEach(el => setText(el, S.boosts[el.dataset.left] > 0 ? '⏱ ' + fmtT(S.boosts[el.dataset.left]) : ''));
+}
+function refreshDots() {
+  let n = 0;
+  UPGRADES.forEach(u => { const l = S.up[u.id]; if (l < u.cost.length && !(u.lvl && S.level < u.lvl) && S.money >= u.cost[l]) n++; });
+  const dot = $('dotUpg'); dot.classList.toggle('on', n > 0); setText(dot, String(n));
+}
+
+/* =====================================================================
+   ШТОРКИ (заказы, помощники, улучшения, награды, меню) И ОКНА
+   ===================================================================== */
+let sheetName = null, modalOpen = false;
+const modalQueue = [];
+const standalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+function sheetHTML(name) {
+  if (name === 'orders') {
+    let h = '<div class="sub">Собирай урожай — он сам засчитывается в заказы (и монеты за него ты тоже получаешь).</div>';
+    S.orders.forEach((o, k) => {
+      if (!o || o.wait !== undefined) { h += `<div class="row locked"><div class="ic">⏳</div><div class="tx"><b>Новый заказ скоро придёт</b>через ${o ? fmtT(o.wait) : '…'}</div></div>`; return; }
+      const c = CUSTOMERS[o.who], done = orderDone(o);
+      const need = o.need.map(q => `${ITEM[q.item].e} ${ITEM[q.item].k === 'animal' ? ITEM[q.item].pn : ITEM[q.item].n}: <em>${q.got}/${q.qty}</em>`).join(' &nbsp; ');
+      h += `<div class="row${done ? ' done' : ''}"><div class="ic">${c[0]}</div><div class="tx"><b>${c[1]}</b>«${c[2]}»<br>${need}<br>Награда: <em>${fmt(o.coins)} 🪙 и ${o.xp} ⭐</em></div>` +
+        (done ? `<button class="buy" data-act="claim" data-arg="${k}">Сдать!</button>` : `<button class="buy alt" data-act="skip" data-arg="${k}">Отказать</button>`) + `</div>`;
+    });
+    return ['📋 Заказы', h];
+  }
+  if (name === 'shop') {
+    let h = '<div class="sub">Помощники работают на всех участках сразу. Цена растёт вместе с фермой.</div>';
+    BOOSTS.forEach(b => {
+      if (S.level < b.lvl) { h += `<div class="row locked"><div class="ic">${b.ic}</div><div class="tx"><b>${b.name}</b>${b.desc}</div><button class="buy" disabled>🔒 ур. ${b.lvl}</button></div>`; return; }
+      const price = boostPrice(b);
+      h += `<div class="row${S.boosts[b.id] > 0 ? ' done' : ''}"><div class="ic">${b.ic}</div><div class="tx"><b>${b.name}</b>${b.desc}<br>На ${fmtT(b.dur * teamMult())} <em data-left="${b.id}"></em></div><button class="buy" data-act="boost" data-arg="${b.id}" data-cost="${price}">${short(price)} 🪙</button></div>`;
+    });
+    return ['🧰 Помощники', h];
+  }
+  if (name === 'upg') {
+    let h = '<div class="sub">Улучшения остаются навсегда.</div>';
+    UPGRADES.forEach(u => {
+      const l = S.up[u.id], max = u.cost.length, pips = max > 1 ? `<div class="pips">${u.cost.map((c, k) => `<i class="${k < l ? 'f' : ''}"></i>`).join('')}</div>` : '';
+      let btn;
+      if (l >= max) btn = '<button class="buy" disabled>✔ Готово</button>';
+      else if (u.lvl && S.level < u.lvl) btn = `<button class="buy" disabled>🔒 ур. ${u.lvl}</button>`;
+      else btn = `<button class="buy" data-act="upg" data-arg="${u.id}" data-cost="${u.cost[l]}">${short(u.cost[l])} 🪙</button>`;
+      h += `<div class="row${l >= max ? ' done' : ''}"><div class="ic">${u.ic}</div><div class="tx"><b>${u.name}</b>${l >= max ? u.desc(l) : (l > 0 && max > 1 ? `Сейчас: ${u.desc(l)}<br>` : '') + (max > 1 ? `Станет: <em>${u.desc(l + 1)}</em>` : u.desc(1))}${pips}</div>${btn}</div>`;
+    });
+    return ['⬆️ Улучшения', h];
+  }
+  if (name === 'ach') {
+    const got = ACHS.filter(a => S.ach[a.id]).length;
+    let h = `<div class="sub">Получено наград: ${got} из ${ACHS.length}. Собрано урожаев: ${fmt(S.stats.harv)}, заработано: ${fmt(S.stats.earned)} 🪙</div>`;
+    ACHS.forEach(a => {
+      const done = !!S.ach[a.id], v = Math.min(a.goal, typeof a.st === 'function' ? a.st(S) : S.stats[a.st]);
+      h += `<div class="row${done ? ' done' : ''}"><div class="ic">${a.ic}</div><div class="tx"><b>${a.name}</b>${a.desc}${done ? '' : ` — <em>${short(v)}/${short(a.goal)}</em>`}</div><div style="font-weight:900;white-space:nowrap">${done ? '✅' : '+' + short(a.coins) + ' 🪙'}</div></div>`;
+    });
+    return ['🏆 Награды', h];
+  }
+  // меню
+  let h = `<div class="row"><div class="ic">🔊</div><div class="tx"><b>Звуки и вибрация</b></div><button class="buy ${S.sound ? '' : 'alt'}" data-act="sound">${S.sound ? 'Вкл' : 'Выкл'}</button></div>` +
+    `<div class="row"><div class="ic">🎵</div><div class="tx"><b>Музыка</b>Кнопка 🎵 есть и на главном экране</div><button class="buy ${S.music ? '' : 'alt'}" data-act="music">${S.music ? 'Вкл' : 'Выкл'}</button></div>` +
+    (standalone() ? `<div class="row done"><div class="ic">📲</div><div class="tx"><b>Игра установлена</b>Работает даже без интернета</div></div>`
+      : `<div class="row"><div class="ic">📲</div><div class="tx"><b>Установить на телефон</b>Иконка на экране, игра без интернета</div><button class="buy" data-act="install">Установить</button></div>`) +
+    `<div class="row"><div class="ic">❓</div><div class="tx"><b>Как играть</b></div><button class="buy alt" data-act="help">Открыть</button></div>` +
+    `<div class="sub">Игра сохраняется сама. Чтобы перенести ферму на другое устройство — скопируй код и вставь его там.</div>` +
+    `<textarea class="save" id="saveBox" placeholder="Сюда можно вставить код сохранения"></textarea>` +
+    `<div style="display:flex;gap:8px"><button class="buy alt" style="flex:1" data-act="export">Показать мой код</button><button class="buy alt" style="flex:1" data-act="import">Загрузить из кода</button></div>` +
+    `<div class="row" style="margin-top:6px"><div class="ic">🗑️</div><div class="tx"><b>Начать заново</b>Вся ферма будет стёрта</div><button class="buy red" data-act="reset">Сбросить</button></div>` +
+    `<div class="sub" style="text-align:center">Ферма Антоши 3.0</div>`;
+  return ['⚙️ Меню', h];
+}
+function openSheet(name) {
+  sheetName = name;
+  const [title, html] = sheetHTML(name);
+  $('sheetTitle').textContent = title; $('sheetBody').innerHTML = html;
+  $('sheet').classList.add('on'); $('backdrop').classList.add('on');
+  markAffordable();
+}
+function closeSheet() { sheetName = null; $('sheet').classList.remove('on'); $('backdrop').classList.remove('on'); }
+
+function queueModal(html, onShow) { modalQueue.push([html, onShow]); if (!modalOpen) nextModal(); }
+function nextModal() {
+  const m = modalQueue.shift();
+  if (!m) { modalOpen = false; $('modal').classList.remove('on'); return; }
+  modalOpen = true;
+  $('mbox').innerHTML = m[0]; $('modal').classList.add('on');
+  if (m[1]) m[1]();
+}
+function showHelp() {
+  queueModal(`<h2>Как играть</h2><ul>
+    <li>🌱 Выбери семена внизу и тапни по грядке. Можно вести пальцем сразу по многим.</li>
+    <li>💧 Тап по ростку — полив: растёт вдвое быстрее.</li>
+    <li>🧺 Тап по спелому — сбор. Собирай подряд — растёт <b>комбо</b> и цена.</li>
+    <li>✨ Золотой урожай стоит втрое дороже.</li>
+    <li>🌿 Зелёные клетки — новые грядки, их можно купить.</li>
+    <li>🐛 Вредителей прогоняй тапом, иначе съедят урожай.</li>
+    <li>🌦️ Следи за погодой: дождь помогает, жара мешает, гроза опасна.</li>
+    <li>📋 Заказы и 🔥 товар дня приносят больше монет и опыта.</li>
+    <li>🍎 Деревья и 🐄 животные дают продукты снова и снова — даже когда игра закрыта.</li>
+    <li>🏰 Главная цель — построить Дворец фермера!</li></ul>
+    <div class="btns"><button class="buy" data-close>Понятно!</button></div>`);
+}
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+window.addEventListener('appinstalled', () => { installEvt = null; toast('📲 Игра установлена! Ищи иконку на экране'); });
+function install() {
+  if (installEvt) { installEvt.prompt(); installEvt.userChoice.then(() => { installEvt = null; }); return; }
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  queueModal(`<div class="big">📲</div><h2>Установка на телефон</h2>` + (ios
+    ? `<ul><li>1. Открой игру в <b>Safari</b></li><li>2. Нажми кнопку «Поделиться» (квадрат со стрелкой)</li><li>3. Выбери <b>«На экран Домой»</b></li></ul>`
+    : `<ul><li>1. Открой игру в <b>Chrome</b></li><li>2. Нажми меню <b>⋮</b> справа вверху</li><li>3. Выбери <b>«Установить приложение»</b> или «Добавить на главный экран»</li></ul>`) +
+    `<p>После этого у игры будет своя иконка, и она будет работать без интернета.</p><div class="btns"><button class="buy" data-close>Понятно</button></div>`);
+}
+function sheetAction(act, arg) {
+  if (act === 'claim') { claimOrder(+arg); return; }
+  if (act === 'skip') { S.orders[+arg] = { wait: 40 }; }
+  else if (act === 'boost') buyBoost(arg);
+  else if (act === 'upg') buyUpgrade(arg);
+  else if (act === 'sound') { S.sound = !S.sound; sfx('click'); }
+  else if (act === 'music') setMusic(!S.music);
+  else if (act === 'install') { closeSheet(); install(); return; }
+  else if (act === 'help') { closeSheet(); showHelp(); return; }
+  else if (act === 'export') { save(); const b = $('saveBox'); b.value = btoa(unescape(encodeURIComponent(JSON.stringify(S)))); b.focus(); b.select(); try { navigator.clipboard.writeText(b.value).then(() => toast('Код скопирован ✔'), () => toast('Выдели код и скопируй его')); } catch (e) { toast('Выдели код и скопируй его'); } return; }
+  else if (act === 'import') {
+    try {
+      const s = JSON.parse(decodeURIComponent(escape(atob($('saveBox').value.trim()))));
+      if (!s || !Array.isArray(s.areas) || typeof s.money !== 'number') throw 0;
+      S = normalize(s); S.last = Date.now(); save(); closeSheet(); renderAll(); toast('Ферма загружена ✔');
+    } catch (e) { toast('Код не подошёл 😕 Проверь, что скопирован целиком'); }
+    return;
+  }
+  else if (act === 'reset') {
+    queueModal(`<div class="big">🗑️</div><h2>Начать заново?</h2><p>Вся ферма, монеты и уровни будут стёрты. Вернуть нельзя.</p><div class="btns"><button class="buy alt" data-close>Нет, оставить</button><button class="buy red" data-close data-do="reset">Стереть</button></div>`);
+    closeSheet(); return;
+  }
+  hudDirty = true;
+  if (sheetName) openSheet(sheetName);
+}
+function askArea(ai) {
+  const d = AREAS[ai];
+  if (S.level < d.lvl) { toast(`${d.icon} ${d.name} откроется на ${d.lvl} уровне`); return; }
+  queueModal(`<div class="big">${d.icon}</div><h2>Открыть: ${d.name}</h2><p>${d.about}</p><p>Цена: <b>${fmt(d.price)} 🪙</b></p><div class="btns"><button class="buy alt" data-close>Потом</button><button class="buy${S.money < d.price ? ' cant' : ''}" data-close data-do="area" data-arg="${ai}">Открыть</button></div>`);
+}
+
+/* =====================================================================
+   УПРАВЛЕНИЕ
+   ===================================================================== */
+function bindInput() {
+  const field = $('field');
+  let drag = null;
+  field.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.plot'); if (!el) return;
+    e.preventDefault(); audio();
+    const i = +el.dataset.i, kind = tapPlot(i, false);
+    drag = { kind, last: i, id: e.pointerId };
+    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+    renderField();
+  });
+  field.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id || !['harvest', 'plant', 'water', 'whack'].includes(drag.kind)) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY), pl = el && el.closest ? el.closest('.plot') : null;
+    if (!pl || pl.parentNode !== field) return;
+    const i = +pl.dataset.i; if (i === drag.last) return;
+    drag.last = i;
+    const k = kindFor(i);
+    if (k === drag.kind || k === 'whack') { tapPlot(i, true); renderField(); }
+  });
+  const end = () => { drag = null; };
+  window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
+  field.addEventListener('contextmenu', e => e.preventDefault());
+
+  $('seedStrip').addEventListener('click', e => {
+    const b = e.target.closest('.seed'); if (!b) return;
+    if (b.dataset.locked) { toast(`Откроется на ${b.dataset.locked} уровне ⭐`); return; }
+    if (b.dataset.tool) tool = tool === 'remove' ? 'hand' : 'remove';
+    else { tool = 'hand'; curArea().sel = b.dataset.seed; }
+    sfx('click'); const sl = $('seedStrip').scrollLeft; renderSeeds(); $('seedStrip').scrollLeft = sl; renderField();
+  });
+  $('areaTabs').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const ai = +b.dataset.area;
+    if (!S.areas[ai].unlocked) { askArea(ai); return; }
+    if (ai === S.areaIdx) return;
+    S.areaIdx = ai; tool = 'hand'; pendingRemove = null; sfx('click');
+    parkSprites();
+    renderAll();
+  });
+  $('ordersRow').addEventListener('click', e => {
+    const b = e.target.closest('[data-order]');
+    if (b && orderDone(S.orders[+b.dataset.order])) claimOrder(+b.dataset.order); else { sfx('click'); openSheet('orders'); }
+  });
+  document.querySelector('.nav').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { sfx('click'); openSheet(b.dataset.sheet); } });
+  $('menuBtn').addEventListener('click', () => { sfx('click'); openSheet('menu'); });
+  $('musBtn').addEventListener('click', () => setMusic(!S.music));
+  // браузер разрешает звук только после касания — тогда и возвращаем музыку, если она была включена
+  window.addEventListener('pointerdown', e => { if (wantMusic && !e.target.closest('#musBtn')) setMusic(true); }, true);
+  $('sheetClose').addEventListener('click', closeSheet);
+  $('backdrop').addEventListener('click', closeSheet);
+  $('sheetBody').addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b) sheetAction(b.dataset.act, b.dataset.arg); });
+  $('modal').addEventListener('click', e => {
+    const b = e.target.closest('[data-close]'); if (!b) return;
+    if (b.dataset.do === 'area') buyArea(+b.dataset.arg);
+    if (b.dataset.do === 'reset') { try { localStorage.removeItem(SAVE_KEY); } catch (err) { /* нечего стирать */ } S = freshState(); tool = 'hand'; renderAll(); save(); }
+    nextModal();
+  });
+  $('wxChip').addEventListener('click', () => toast(`${WX[S.weather.cur].ic} ${WX[S.weather.cur].about}`));
+  $('hotChip').addEventListener('click', () => { const it = ITEM[S.hot.item]; if (it) toast(`🔥 Товар дня: ${it.e} ${it.k === 'animal' ? it.pn : it.n} продаётся в 2 раза дороже`); });
+  $('waterBox').addEventListener('click', () => toast('💧 Вода для полива. Колодец наполняется сам'));
+  $('lvlBox').addEventListener('click', () => toast(`⭐ Уровень ${S.level}. Опыт дают урожай и заказы`));
+  $('coinBox').addEventListener('click', () => toast(`🪙 Ферма приносит примерно ${fmt(income() * 60)} монет в минуту`));
+  $('bgMusic').addEventListener('ended', () => { track = (track + 1) % PLAYLIST.length; const m = $('bgMusic'); m.src = PLAYLIST[track]; m.play().catch(() => {}); });
+
+  // секретный код из прошлых версий: набери на клавиатуре a-s-d
+  let keys = '';
+  document.addEventListener('keydown', e => { keys = (keys + (e.key || '').toLowerCase()).slice(-3); if (keys === 'asd') { keys = ''; addMoney(prize(600)); toast('🤫 Секретный код сработал!'); } });
+
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else lastTick = 0; });
+  window.addEventListener('pagehide', save);
+}
+
+/* =====================================================================
+   ЗАПУСК
+   ===================================================================== */
+let lastTick = 0;
+function loop() {
+  const now = Date.now();
+  let dt = lastTick ? (now - lastTick) / 1000 : (now - S.last) / 1000;
+  lastTick = now;
+  if (dt > 5) {                       // вернулись после перерыва
+    const ripe = fastForward(dt);
+    if (dt > 90) queueModal(`<div class="big">😴</div><h2>С возвращением!</h2><p>Тебя не было ${fmtT(dt)}.</p><p>${ripe > 0 ? `Пока ты отдыхал, созрело: <b>${ripe}</b> 🧺 Собирай скорее!` : 'Ферма ждала тебя.'}</p><div class="btns"><button class="buy" data-close>За работу!</button></div>`);
+    renderAll();
+  } else if (dt > 0) tick(Math.min(dt, 1));
+  S.last = now;
+  renderFrame();
+}
+function boot() {
+  const field = $('field');
+  for (let i = 0; i < 20; i++) { const el = document.createElement('div'); el.className = 'plot'; el.dataset.i = i; field.appendChild(el); plotEls.push(el); }
+  const saved = load();
+  S = saved || freshState();
+  if (!saved) {
+    let old = false;
+    try { old = !!(localStorage.getItem('antonFarmSave2') || localStorage.getItem('antonFarmSave')); } catch (e) { /* нет доступа */ }
+    if (old) { S.money += 50; queueModal(`<div class="big">👋</div><h2>Привет, опытный фермер!</h2><p>Это новая Ферма Антоши 3. Здесь всё начинается заново, но за старые заслуги держи подарок: <b>+50 🪙</b></p><div class="btns"><button class="buy" data-close>Спасибо!</button></div>`); }
+  }
+  if (!S.hot.item || !ITEM[S.hot.item]) newHot();
+  wantMusic = !!S.music; S.music = false;
+  bindInput();
+  parkSprites();
+  renderAll();
+  loop();
+  setInterval(loop, 250);
+  if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) navigator.serviceWorker.register('ferma3-sw.js').catch(() => {});
+}
+boot();
+</script>
+</body>
+</html>
