@@ -1,0 +1,18 @@
+{
+  "id": "ferma3",
+  "name": "Ферма Антоши 3",
+  "short_name": "Ферма Антоши",
+  "description": "Весёлая ферма: сажай, поливай, собирай урожай и выполняй заказы",
+  "lang": "ru",
+  "start_url": "./ferma3.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#7cc04b",
+  "theme_color": "#4f9a2a",
+  "icons": [
+    { "src": "ferma3-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "ferma3-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "ferma3-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
