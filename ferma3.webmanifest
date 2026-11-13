@@ -5,7 +5,7 @@
   "description": "Весёлая ферма: сажай, поливай, собирай урожай и выполняй заказы",
   "lang": "ru",
   "start_url": "./ferma3.html",
-  "scope": "./",
+  "scope": "./ferma3",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#7cc04b",
